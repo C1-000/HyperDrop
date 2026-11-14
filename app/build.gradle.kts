@@ -15,15 +15,15 @@ apksign {
 }
 
 android {
-    namespace = "moe.chenxy.oppopods"
+    namespace = "cythen.hyperdrop"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "rongyi.puddingpods"
+        applicationId = "cythen.hyperdrop"
         minSdk = 35
         targetSdk = 36
-        versionCode = 347
-        versionName = "3.47"
+        versionCode = 1
+        versionName = "1.0.0"
         buildConfigField("long", "BUILD_TIMESTAMP", System.currentTimeMillis().toString())
     }
 

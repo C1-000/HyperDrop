@@ -66,14 +66,14 @@ LSPosed 作用域：
 - `com.android.systemui`
 - `com.android.settings`
 
-Focus Island 采用 OppoPods 的 Xiaomi 耳机通知结构和 HyperOriG 的 `FocusNotification.buildV3` 路线。3.45 在 `com.xiaomi.bluetooth` 应用生命周期就注册广播接收器，并使用新的 `puddingpods_focus_island_v2` 通知通道，避免旧通道状态或构造函数时序导致岛消失。岛点击入口固定为 PuddingPods `PopupActivity`；弹窗“更多”再进入 HyperOS 原生 `MiuiHeadsetActivity`，因此焦点岛显示与系统耳机页面互不冲突。
+Focus Island 采用 OppoPods 的 Xiaomi 耳机通知结构和 HyperOriG 的 `FocusNotification.buildV3` 路线。3.45 在 `com.xiaomi.bluetooth` 应用生命周期就注册广播接收器，并使用新的 `hyperdrop_focus_island_v2` 通知通道，避免旧通道状态或构造函数时序导致岛消失。岛点击入口固定为 HyperDrop `PopupActivity`；弹窗“更多”再进入 HyperOS 原生 `MiuiHeadsetActivity`，因此焦点岛显示与系统耳机页面互不冲突。
 
 系统中存在两类页面：
 
 1. `MiuiHeadsetActivity`：HyperOS 高级耳机页面，用于兼容 `01010607`、产品图及高级耳机能力。
 2. `BluetoothDeviceDetailsFragment`：系统「已配对的蓝牙设备」详情页，用于通话/媒体音频、LHDC、低延迟、与本机音量同步等系统 Profile/厂商控制。
 
-PuddingPods 3.46 优先直接打开 `BluetoothDeviceDetailsFragment`；若 HyperOS 禁止第三方直接启动 `SubSettings`，则通过已注入 `com.android.settings` 的进程桥接，由 Settings 自己打开同一页面。
+前身 3.46 版本优先直接打开 `BluetoothDeviceDetailsFragment`；若 HyperOS 禁止第三方直接启动 `SubSettings`，则通过已注入 `com.android.settings` 的进程桥接，由 Settings 自己打开同一页面。
 
 
 ## HyperOS 原生 ANC 三档显示

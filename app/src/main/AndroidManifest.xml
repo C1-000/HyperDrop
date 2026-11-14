@@ -48,13 +48,13 @@
             android:excludeFromRecents="true"
             android:exported="true">
             <intent-filter>
-                <action android:name="chen.action.oppopods.show_pods_ui" />
+                <action android:name="cythen.hyperdrop.action.show_pods_ui" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
         <provider
             android:name=".config.PodImageProvider"
-            android:authorities="rongyi.puddingpods.podimages"
+            android:authorities="cythen.hyperdrop.podimages"
             android:exported="true"
             android:grantUriPermissions="true" />
         <!-- Set as Xposed Module -->
@@ -65,7 +65,7 @@
         <!-- Set your Xposed Module description -->
         <meta-data
             android:name="xposeddescription"
-            android:value="MOONDROP PUDDING support for Xiaomi HyperOS." />
+            android:value="System-level control for MOONDROP earphones on Xiaomi HyperOS." />
 
         <!-- The minimum Xposed version number -->
         <meta-data

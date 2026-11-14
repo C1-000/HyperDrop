@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PuddingPods</string>
+    <string name="app_name">hyperdrop</string>
     <string name="app_subtitle">水月雨布丁适配 HyperOS</string>
     <string name="pod_info">耳机信息</string>
-    <string name="about">关于 PuddingPods</string>
+    <string name="about">关于 HyperDrop</string>
     <string name="settings">设置</string>
     <string name="module">模块</string>
     <string name="earphones">耳机</string>
@@ -117,7 +117,7 @@
     <string name="anc_implementation_compatible">兼容</string>
 
     <string name="pudding_gain_title">增益</string>
-    <string name="pudding_gain_summary">设置水月雨布丁的输出增益</string>
+    <string name="pudding_gain_summary">设置耳机的输出增益</string>
     <string name="pudding_gain_low">低增益</string>
     <string name="pudding_gain_medium">中增益</string>
     <string name="pudding_gain_high">高增益</string>
@@ -131,7 +131,7 @@
     <string name="modifier_credit_summary">酷安：http://www.coolapk.com/u/30640322</string>
     <string name="language_traditional">繁體中文</string>
     <string name="app_settings_entry">应用设置</string>
-    <string name="app_settings_entry_summary">打开 PuddingPods 设置</string>
+    <string name="app_settings_entry_summary">打开 HyperDrop 设置</string>
     <string name="system_headset_settings_entry">系统耳机设置</string>
     <string name="system_headset_settings_entry_summary">打开 HyperOS 原生耳机设置</string>
 </resources>

@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/e8a3df6b-6e67-485a-ae1c-018ac24e87d4" width="120" height="120" style="border-radius: 24px;" alt="PuddingPods Icon"/>
+<img src="https://github.com/user-attachments/assets/e8a3df6b-6e67-485a-ae1c-018ac24e87d4" width="120" height="120" style="border-radius: 24px;" alt="HyperDrop Icon"/>
 
-# PuddingPods
+# HyperDrop
 
-**System-level MOONDROP PUDDING earphone control for HyperOS devices**
+**System-level MOONDROP earphone control for HyperOS devices**
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android)](https://android.com)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
@@ -14,10 +14,10 @@
 
 </div>
 
-An Xposed module that provides system-level control for **MOONDROP PUDDING / MD-TWS-056** earphones on Xiaomi HyperOS devices.
+An Xposed module that provides system-level control for **MOONDROP earphones** on Xiaomi HyperOS devices. PUDDING / MD-TWS-056 is the first supported model, with more models planned.
 
-Current version: **3.47**  
-Application ID: `rongyi.puddingpods`
+Current version: **1.0.0**  
+Application ID: `cythen.hyperdrop`
 
 ### Earphone Features
 
@@ -40,9 +40,9 @@ Application ID: `rongyi.puddingpods`
 - **Dedicated Detail Page** — Provides the PUDDING product image, battery, ANC, gain, indicator light, and app settings.
 - **Languages** — Supports Traditional Chinese, Simplified Chinese, English, and Follow System; Traditional Chinese is the default on first install.
 
-### MOONDROP PUDDING Adaptation
+### Device Support and Protocol
 
-PuddingPods communicates directly with the earphones over Classic Bluetooth RFCOMM / SPP and controls PUDDING through Qualcomm GAIA v4. The MOONDROP official app does not need to stay running.
+HyperDrop communicates directly with the earphones over Classic Bluetooth RFCOMM / SPP and controls supported MOONDROP models through Qualcomm GAIA v4. The MOONDROP official app does not need to stay running.
 
 For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDING_ADAPTATION.md](PUDDING_ADAPTATION.md).
 
@@ -56,7 +56,7 @@ For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDI
 1. Install the APK.
 2. Enable the module in LSPosed and select the recommended scopes.
 3. Restart the required scopes or reboot the device.
-4. Connect the MOONDROP PUDDING via Bluetooth.
+4. Connect a supported MOONDROP earphone (currently PUDDING / MD-TWS-056) via Bluetooth.
 
 ### Credits
 

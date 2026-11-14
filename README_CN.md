@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/e8a3df6b-6e67-485a-ae1c-018ac24e87d4" width="120" height="120" style="border-radius: 24px;" alt="PuddingPods Icon"/>
+<img src="https://github.com/user-attachments/assets/e8a3df6b-6e67-485a-ae1c-018ac24e87d4" width="120" height="120" style="border-radius: 24px;" alt="HyperDrop Icon"/>
 
-# PuddingPods
+# HyperDrop
 
-**为 HyperOS 设备提供系统级 MOONDROP 水月雨 PUDDING 耳机控制**
+**为 HyperOS 设备提供系统级 MOONDROP 水月雨耳机控制**
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android)](https://android.com)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
@@ -14,10 +14,10 @@
 
 </div>
 
-为小米 HyperOS 设备提供系统级 **MOONDROP 水月雨 PUDDING / MD-TWS-056** 耳机控制的 Xposed 模块。
+为小米 HyperOS 设备提供系统级 **MOONDROP 水月雨系列耳机** 控制的 Xposed 模块；目前完成 PUDDING / MD-TWS-056，并逐步扩充其他型号。
 
-当前版本：**3.47**  
-应用 ID：`rongyi.puddingpods`
+当前版本：**1.0.0**  
+应用 ID：`cythen.hyperdrop`
 
 ### 耳机功能
 
@@ -40,9 +40,9 @@
 - **独立详情页** — 提供 PUDDING 产品图、电量、ANC、增益、指示灯和应用设置。
 - **多语言** — 支持繁體中文、简体中文、English 和跟随系统；首次安装默认繁體中文。
 
-### 水月雨 PUDDING 适配
+### 设备支持与协议
 
-PuddingPods 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使用 Qualcomm GAIA v4 控制 PUDDING；不依赖水月雨官方 App 常驻。
+HyperDrop 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使用 Qualcomm GAIA v4 控制受支持的 MOONDROP 耳机；不依赖水月雨官方 App 常驻。
 
 协议、命令、电量解析和 HyperOS 映射见 [PUDDING_ADAPTATION.md](PUDDING_ADAPTATION.md)。
 
@@ -56,7 +56,7 @@ PuddingPods 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使
 1. 安装 APK。
 2. 在 LSPosed 中启用模块并勾选推荐作用域。
 3. 重启所需作用域或直接重启手机。
-4. 通过蓝牙连接 MOONDROP PUDDING。
+4. 通过蓝牙连接受支持的 MOONDROP 耳机（目前为 PUDDING / MD-TWS-056）。
 
 ### 致谢
 
