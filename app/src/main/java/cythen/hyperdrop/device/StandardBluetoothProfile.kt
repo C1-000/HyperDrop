@@ -1,5 +1,7 @@
 package cythen.hyperdrop.device
 
+import cythen.hyperdrop.device.protocol.NoOpGaiaCommandTable
+
 /**
  * Conservative fallback for a Bluetooth name that matches no known MOONDROP model.
  *
@@ -14,4 +16,6 @@ object StandardBluetoothProfile : DeviceProfile {
     override fun matches(name: String?): Boolean = false
 
     override val capabilities: DeviceCapabilities = DeviceCapabilities.NONE
+
+    override val commandTable = NoOpGaiaCommandTable
 }

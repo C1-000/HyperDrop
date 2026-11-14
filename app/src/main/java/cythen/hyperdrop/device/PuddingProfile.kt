@@ -1,5 +1,6 @@
 package cythen.hyperdrop.device
 
+import cythen.hyperdrop.device.protocol.PuddingCommandTable
 import cythen.hyperdrop.pods.AncImplementation
 
 /**
@@ -24,4 +25,6 @@ object PuddingProfile : DeviceProfile {
         spatialSoundSwitchSupported = false,
         ancImplementation = AncImplementation.STANDARD,
     )
+
+    override val commandTable = PuddingCommandTable
 }

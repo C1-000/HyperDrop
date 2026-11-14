@@ -21,6 +21,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import cythen.hyperdrop.BuildConfig
 import cythen.hyperdrop.config.ConfigManager
+import cythen.hyperdrop.device.DeviceRegistry
+import cythen.hyperdrop.device.protocol.GaiaCommandTable
+import cythen.hyperdrop.device.protocol.GaiaReport
+import cythen.hyperdrop.device.protocol.GaiaTransport
 import cythen.hyperdrop.utils.MediaControl
 import cythen.hyperdrop.utils.SystemApisUtils
 import cythen.hyperdrop.utils.SystemApisUtils.setIconVisibility
@@ -41,6 +45,7 @@ object RfcommController {
     private const val TAG = "HyperDrop-RfcommController"
     private const val AUTO_RECONNECT_DELAY_MS = 120_000L
     private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
+    private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
 
     // Basic Objects
     private var socket: BluetoothSocket? = null
@@ -65,7 +70,7 @@ object RfcommController {
     private var currentSpatialAudioMode: Int = SpatialAudioMode.OFF
     /** -1 = unknown; otherwise one of [EqPreset.ALL]. */
     private var currentEqPreset: Int = -1
-    private var currentGainLevel = PuddingGaia.GainLevel.MEDIUM.uiValue
+    private var currentGainLevel = DEFAULT_GAIN_LEVEL
     private var currentLedEnabled = true
     private var lastKnownLeftBattery: Int = 0
     private var lastKnownRightBattery: Int = 0
@@ -96,8 +101,7 @@ object RfcommController {
     private var readerJob: kotlinx.coroutines.Job? = null
     private val reconnectAttempts = AtomicInteger(0)
     private var reconnectPending = false
-    private val PUDDING_RFCOMM_UUID: UUID = UUID.fromString(PuddingGaia.SPP_UUID)
-    private val puddingDecoder = PuddingGaia.StreamDecoder()
+    private val decoder = GaiaTransport.StreamDecoder()
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(p0: Context?, p1: Intent?) {
@@ -464,7 +468,7 @@ object RfcommController {
     }
 
     private fun createRfcommSocket(device: BluetoothDevice): BluetoothSocket {
-        return device.createRfcommSocketToServiceRecord(PUDDING_RFCOMM_UUID)
+        return device.createRfcommSocketToServiceRecord(UUID.fromString(commandTable().sppUuid))
     }
 
     fun connectPod(context: Context, device: BluetoothDevice, prefs: SharedPreferences, appRequested: Boolean = false) {
@@ -491,7 +495,7 @@ object RfcommController {
         }
         ConfigManager.refreshFromPrefs(mPrefs)
         Log.d(TAG, "Adaptive support initial: ${currentCapabilities().adaptiveSupported}")
-        Log.d(TAG, "PUDDING RFCOMM UUID: $PUDDING_RFCOMM_UUID")
+        Log.d(TAG, "RFCOMM UUID: ${commandTable().sppUuid}")
 
         if (!receiverRegistered) {
             context.registerReceiver(broadcastReceiver, IntentFilter().apply {
@@ -607,8 +611,8 @@ object RfcommController {
                 socket = newSocket
                 reconnectAttempts.set(0)
                 reconnectPending = false
-                Log.d(TAG, "PUDDING RFCOMM connected! uuid=$PUDDING_RFCOMM_UUID")
-                RfcommLog.i(mContext, TAG, "connected uuid=$PUDDING_RFCOMM_UUID")
+                Log.d(TAG, "RFCOMM connected! uuid=${commandTable().sppUuid}")
+                RfcommLog.i(mContext, TAG, "connected uuid=${commandTable().sppUuid}")
                 changeUIConnectionState("connecting")
 
                 startPacketReader(newSocket.inputStream)
@@ -616,17 +620,17 @@ object RfcommController {
                 delay(180)
                 // Match the official MOONDROP app: negotiate GAIA with a v1 API-version
                 // request, then use v4 for PUDDING commands.
-                sendPacketSafe(PuddingGaia.v1(PuddingGaia.QUERY_GAIA_VERSION))
+                sendPacketSafe(GaiaTransport.v1(commandTable().queryGaiaVersion))
                 delay(180)
-                sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_NOISE_MODE))
+                sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode))
                 delay(100)
-                sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_GAIN_LEVEL))
+                sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
                 delay(100)
-                sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_LED_STATE))
+                sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
                 delay(100)
-                sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_SUPPORTED_BATTERIES))
+                sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))
                 delay(80)
-                sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_BATTERY_LEVELS))
+                sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
 
                 changeUIConnectionState("connected")
                 sendAppStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
@@ -688,7 +692,7 @@ object RfcommController {
     private fun closeSocketOnly() {
         readerJob?.cancel()
         readerJob = null
-        puddingDecoder.reset()
+        decoder.reset()
         try {
             socket?.close()
         } catch (_: IOException) {}
@@ -705,7 +709,7 @@ object RfcommController {
                     if (bytesRead > 0) {
                         val chunk = buffer.copyOfRange(0, bytesRead)
                         RfcommLog.d(mContext, "RFCOMM/RX", chunk.toHexString(HexFormat.UpperCase))
-                        puddingDecoder.feed(chunk).forEach(::handlePuddingPayload)
+                        decoder.feed(chunk).forEach(::handleGaiaPayload)
                     } else if (bytesRead == -1) {
                         Log.d(TAG, "RFCOMM stream ended")
                         RfcommLog.w(mContext, TAG, "stream ended")
@@ -724,97 +728,45 @@ object RfcommController {
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    private fun handlePuddingPayload(payload: ByteArray) {
-        Log.v(TAG, "PUDDING GAIA payload: ${payload.toHexString(HexFormat.UpperCase)}")
-
-        // SET mode echo/notification: 00 1D 41 04 <mode>
-        // GET mode response observed during official-app initialisation: 00 1D 41 03 <mode>
-        if (payload.size >= 5 &&
-            payload[0] == 0x00.toByte() && payload[1] == 0x1D.toByte() &&
-            payload[2] == 0x41.toByte() && (payload[3] == 0x04.toByte() || payload[3] == 0x03.toByte())) {
-            val wireValue = payload[4].toInt() and 0xFF
-            val mode = PuddingGaia.NoiseMode.fromWire(wireValue)
-            if (mode != null) {
+    private fun handleGaiaPayload(payload: ByteArray) {
+        Log.v(TAG, "GAIA payload: ${payload.toHexString(HexFormat.UpperCase)}")
+        when (val report = commandTable().parse(payload)) {
+            is GaiaReport.AncMode -> {
                 val previousAnc = currentAnc
-                currentAnc = mode.uiStatus
+                currentAnc = report.uiStatus
                 changeUIAncStatus(currentAnc)
-                Log.i(TAG, "PUDDING noise mode: $mode (wire=$wireValue ui=${mode.uiStatus}) previous=$previousAnc")
-                // If the mode changed outside HyperDrop (for example an earbud long-press),
-                // refresh left/right/case battery immediately. App-originated SETs update
-                // currentAnc first, so their echo does not trigger an extra battery query.
-                if (previousAnc != currentAnc) {
-                    queryBattery()
+                Log.i(TAG, "noise mode: ui=${report.uiStatus} wire=${report.wire} previous=$previousAnc")
+                // A mode change made outside HyperDrop (e.g. an earbud long-press) refreshes
+                // battery immediately. App-originated SETs update currentAnc first, so their
+                // echo does not trigger an extra battery query.
+                if (previousAnc != currentAnc) queryBattery()
+            }
+            is GaiaReport.Battery -> {
+                val left = report.left?.let { BatteryParser.BatteryInfo(it, false) }
+                val right = report.right?.let { BatteryParser.BatteryInfo(it, false) }
+                val case = report.case?.let { BatteryParser.BatteryInfo(it, false) }
+                if (left != null || right != null || case != null) {
+                    handleBatteryChanged(BatteryParser.BatteryResult(left, right, case))
+                    Log.i(TAG, "battery: left=${report.left} right=${report.right} case=${report.case}")
                 }
-                return
             }
-        }
-
-        // Qualcomm Battery feature RESPONSE: 00 1D 1B 01 [batteryId, level]...
-        // Battery ids from the official GAIA SDK: 1=left, 2=right, 3=charging case.
-        // PUDDING reports percentage only here; charging state is not encoded by this response.
-        if (payload.size >= 6 &&
-            payload[0] == 0x00.toByte() && payload[1] == 0x1D.toByte() &&
-            payload[2] == 0x1B.toByte() && payload[3] == 0x01.toByte()) {
-            var left: BatteryParser.BatteryInfo? = null
-            var right: BatteryParser.BatteryInfo? = null
-            var case: BatteryParser.BatteryInfo? = null
-            var i = 4
-            while (i + 1 < payload.size) {
-                val id = payload[i].toInt() and 0xFF
-                val level = payload[i + 1].toInt() and 0xFF
-                if (level in 0..100) {
-                    val info = BatteryParser.BatteryInfo(level, false)
-                    when (id) {
-                        1 -> left = info
-                        2 -> right = info
-                        3 -> case = info
-                    }
-                }
-                i += 2
-            }
-            if (left != null || right != null || case != null) {
-                handleBatteryChanged(BatteryParser.BatteryResult(left, right, case))
-                Log.i(TAG, "PUDDING battery: left=${left?.level} right=${right?.level} case=${case?.level}")
-                return
-            }
-        }
-
-        // QTIL DAC gain: 00 1D 1F 01/02 <wire>. PUDDING reverses low/high on wire:
-        // wire 2/1/0 = UI low/medium/high.
-        if (payload.size >= 5 &&
-            payload[0] == 0x00.toByte() && payload[1] == 0x1D.toByte() &&
-            payload[2] == 0x1F.toByte() && (payload[3] == 0x01.toByte() || payload[3] == 0x02.toByte())) {
-            val wireValue = payload[4].toInt() and 0xFF
-            val gain = PuddingGaia.GainLevel.fromWire(wireValue)
-            if (gain != null) {
-                currentGainLevel = gain.uiValue
+            is GaiaReport.GainLevel -> {
+                currentGainLevel = report.uiValue
                 changeUIGainLevel(currentGainLevel)
-                Log.i(TAG, "PUDDING gain level: ui=${gain.uiValue} wire=$wireValue")
-                return
+                Log.i(TAG, "gain level: ui=${report.uiValue} wire=${report.wire}")
             }
-        }
-
-        // QTIL LED: 00 1D 27 01/02 <0|1>.
-        if (payload.size >= 5 &&
-            payload[0] == 0x00.toByte() && payload[1] == 0x1D.toByte() &&
-            payload[2] == 0x27.toByte() && (payload[3] == 0x01.toByte() || payload[3] == 0x02.toByte())) {
-            val value = payload[4].toInt() and 0xFF
-            if (value == 0 || value == 1) {
-                currentLedEnabled = value == 1
+            is GaiaReport.LedEnabled -> {
+                currentLedEnabled = report.enabled
                 changeUILedState(currentLedEnabled)
-                Log.i(TAG, "PUDDING LED enabled: $currentLedEnabled")
-                return
+                Log.i(TAG, "LED enabled: $currentLedEnabled")
+            }
+            GaiaReport.GaiaNegotiation -> {
+                Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
+            }
+            GaiaReport.Unknown -> {
+                Log.d(TAG, "Unhandled GAIA payload: ${payload.toHexString(HexFormat.UpperCase)}")
             }
         }
-
-        // The first v1 response is the GAIA API-version response. Nothing else is needed;
-        // v4 commands can be sent immediately afterwards.
-        if (payload.size >= 4 && payload[0] == 0x00.toByte() && payload[1] == 0x0A.toByte()) {
-            Log.d(TAG, "PUDDING GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
-            return
-        }
-
-        Log.d(TAG, "Unhandled PUDDING GAIA payload: ${payload.toHexString(HexFormat.UpperCase)}")
     }
 
     fun disconnectedPod(context: Context, device: BluetoothDevice) {
@@ -846,7 +798,7 @@ object RfcommController {
         currentTransparencyVocalEnhancement = false
         currentSpatialAudioMode = SpatialAudioMode.OFF
         currentEqPreset = -1
-        currentGainLevel = PuddingGaia.GainLevel.MEDIUM.uiValue
+        currentGainLevel = DEFAULT_GAIN_LEVEL
         currentLedEnabled = true
         lastKnownLeftBattery = 0
         lastKnownRightBattery = 0
@@ -898,14 +850,14 @@ object RfcommController {
     fun setEqPreset(presetId: Int) { Log.d(TAG, "PUDDING: OPPO EQ preset protocol removed; ignored=$presetId") }
 
     fun setGainLevel(level: Int) {
-        val gain = PuddingGaia.GainLevel.fromUi(level) ?: return
-        currentGainLevel = gain.uiValue
+        val packet = commandTable().setGainLevel(level) ?: return
+        currentGainLevel = level
         changeUIGainLevel(currentGainLevel)
         CoroutineScope(Dispatchers.IO).launch {
-            Log.d(TAG, "set PUDDING gain: ui=${gain.uiValue} wire=${gain.wireValue}")
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.setGainLevel(gain)), "PUDDING gain")
+            Log.d(TAG, "set gain: ui=$level wire=${commandTable().gainUiToWire(level)}")
+            sendPacketSafe(GaiaTransport.v4(packet), "gain")
             delay(140)
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_GAIN_LEVEL))
+            sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
         }
     }
 
@@ -913,22 +865,29 @@ object RfcommController {
         currentLedEnabled = enabled
         changeUILedState(enabled)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.setLedEnabled(enabled)), "PUDDING LED")
+            sendPacketSafe(GaiaTransport.v4(commandTable().setLedEnabled(enabled)), "LED")
             delay(140)
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_LED_STATE))
+            sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
         }
     }
 
     fun cycleAnc() {
-        val cycle = listOf(2, 4, 5, 3, 1)
+        val cycle = commandTable().ancCycle
+        if (cycle.isEmpty()) return
         val currentIndex = cycle.indexOf(currentAnc)
         val next = cycle[(currentIndex + 1).floorMod(cycle.size)]
         setANCMode(next)
     }
 
+    private fun deviceName(): String =
+        if (::mDevice.isInitialized) mDevice.name ?: cachedDeviceName else cachedDeviceName
+
+    private fun commandTable(): GaiaCommandTable =
+        DeviceRegistry.profileFor(deviceName()).commandTable
+
     private fun currentCapabilities(): cythen.hyperdrop.device.DeviceCapabilities {
         return cythen.hyperdrop.device.DeviceRegistry.detectDeviceCapabilities(
-            deviceName = if (::mDevice.isInitialized) mDevice.name ?: cachedDeviceName else cachedDeviceName,
+            deviceName = deviceName(),
             adaptiveOverride = ConfigManager.adaptiveCapabilityOverride(),
             spatialAudioOverride = ConfigManager.spatialAudioCapabilityOverride(),
             spatialSoundSwitchOverride = ConfigManager.spatialSoundSwitchCapabilityOverride(),
@@ -939,25 +898,25 @@ object RfcommController {
     private fun Int.floorMod(divisor: Int): Int = ((this % divisor) + divisor) % divisor
 
     fun setANCMode(mode: Int) {
-        val puddingMode = PuddingGaia.NoiseMode.fromUiStatus(mode) ?: return
-        Log.d(TAG, "set PUDDING noise mode: $puddingMode (ui=$mode wire=${puddingMode.wireValue})")
+        val packet = commandTable().setNoiseMode(mode) ?: return
+        Log.d(TAG, "set noise mode: ui=$mode wire=${commandTable().ancUiToWire(mode)}")
         currentAnc = mode
         changeUIAncStatus(mode)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.setNoiseMode(puddingMode)), "PUDDING noise control")
+            sendPacketSafe(GaiaTransport.v4(packet), "noise control")
             delay(180)
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_NOISE_MODE))
+            sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode))
         }
     }
 
     fun queryBattery() {
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(
-                PuddingGaia.v4(PuddingGaia.QUERY_SUPPORTED_BATTERIES),
-                "PUDDING battery query"
+                GaiaTransport.v4(commandTable().querySupportedBatteries),
+                "battery query"
             )
             delay(80)
-            sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_BATTERY_LEVELS))
+            sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
         }
     }
 
@@ -968,16 +927,16 @@ object RfcommController {
     }
 
     private suspend fun sendStatusQueryPackets(immediateReconnect: Boolean = true) {
-        val reason = if (immediateReconnect) "PUDDING status query" else null
-        sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_NOISE_MODE), reason)
+        val reason = if (immediateReconnect) "status query" else null
+        sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode), reason)
         delay(100)
-        sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_GAIN_LEVEL))
+        sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
         delay(100)
-        sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_LED_STATE))
+        sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
         delay(100)
-        sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_SUPPORTED_BATTERIES))
+        sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))
         delay(80)
-        sendPacketSafe(PuddingGaia.v4(PuddingGaia.QUERY_BATTERY_LEVELS))
+        sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
     }
 
     fun disconnectAudio(context: Context, device: BluetoothDevice?) {

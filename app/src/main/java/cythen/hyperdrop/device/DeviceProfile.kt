@@ -1,13 +1,13 @@
 package cythen.hyperdrop.device
 
+import cythen.hyperdrop.device.protocol.GaiaCommandTable
+
 /**
  * One supported device is one [DeviceProfile]. Everything that varies between models is a
  * property of the profile; the rest of the app talks to the abstract type.
  *
- * Phase B owns identity + capabilities. Phase C adds the protocol members
- * (command table / transport) once those abstractions exist.
- *
- * Adding a new MOONDROP model = one new [DeviceProfile] implementation + one line in
+ * Adding a new MOONDROP model = one new [DeviceProfile] implementation + a
+ * [GaiaCommandTable] for its wire protocol + one line in
  * [DeviceRegistry.registeredProfiles]. No change needed in pods/, hook/ or ui/.
  */
 interface DeviceProfile {
@@ -22,4 +22,7 @@ interface DeviceProfile {
 
     /** Auto-detected capabilities for this model, before user overrides. */
     val capabilities: DeviceCapabilities
+
+    /** Byte-level command vocabulary for this model's GAIA flavour. */
+    val commandTable: GaiaCommandTable
 }
