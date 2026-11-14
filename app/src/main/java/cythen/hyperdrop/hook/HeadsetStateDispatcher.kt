@@ -93,6 +93,6 @@ object HeadsetStateDispatcher : HookContext() {
     @SuppressLint("MissingPermission")
     fun isOppoPod(device: BluetoothDevice): Boolean {
         val name = device.name ?: return false
-        return cythen.hyperdrop.pods.isPuddingDeviceName(name)
+        return cythen.hyperdrop.device.DeviceRegistry.isSupported(name)
     }
 }

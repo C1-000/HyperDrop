@@ -926,8 +926,8 @@ object RfcommController {
         setANCMode(next)
     }
 
-    private fun currentCapabilities(): DeviceCapabilities {
-        return detectDeviceCapabilities(
+    private fun currentCapabilities(): cythen.hyperdrop.device.DeviceCapabilities {
+        return cythen.hyperdrop.device.DeviceRegistry.detectDeviceCapabilities(
             deviceName = if (::mDevice.isInitialized) mDevice.name ?: cachedDeviceName else cachedDeviceName,
             adaptiveOverride = ConfigManager.adaptiveCapabilityOverride(),
             spatialAudioOverride = ConfigManager.spatialAudioCapabilityOverride(),

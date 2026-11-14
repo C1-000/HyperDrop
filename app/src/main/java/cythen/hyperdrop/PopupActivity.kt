@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import cythen.hyperdrop.pods.NoiseControlMode
-import cythen.hyperdrop.pods.detectDeviceCapabilities
+import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.ui.AppLocale
 import cythen.hyperdrop.ui.AppTheme
@@ -153,7 +153,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
     val transparencyVocalEnhancement = remember { mutableStateOf(false) }
     val deviceName = remember { mutableStateOf("") }
     val appConfig = remember { ConfigManager.refreshFromPrefs(prefs) }
-    val capabilities = detectDeviceCapabilities(
+    val capabilities = DeviceRegistry.detectDeviceCapabilities(
         deviceName = deviceName.value,
         adaptiveOverride = appConfig.adaptiveCapabilityOverride,
         spatialAudioOverride = appConfig.spatialAudioCapabilityOverride,

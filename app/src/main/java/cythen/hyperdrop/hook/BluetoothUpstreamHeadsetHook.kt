@@ -610,7 +610,7 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
         if (device == null) return false
         val address = runCatching { device.address }.getOrNull()
         val name = runCatching { device.name ?: device.alias }.getOrNull().orEmpty()
-        val result = cythen.hyperdrop.pods.isPuddingDeviceName(name) || (address != null && isOppoAddress(address))
+        val result = cythen.hyperdrop.device.DeviceRegistry.isSupported(name) || (address != null && isOppoAddress(address))
         if (result && address != null) knownOppoAddresses.add(address.uppercase())
         return result
     }

@@ -51,7 +51,7 @@ import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearState
 import cythen.hyperdrop.pods.WearStatus
-import cythen.hyperdrop.pods.detectDeviceCapabilities
+import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.ui.pages.AboutPage
 import cythen.hyperdrop.ui.pages.RfcommDebugPage
 import cythen.hyperdrop.ui.pages.ThemeSettingsPage
@@ -188,7 +188,7 @@ fun MainUI(
     val displayAnc = ancMode.value
     val displayTransparencyVocalEnhancement = transparencyVocalEnhancement.value
     val displayTitle = mainTitle.value.takeIf { it.isNotBlank() && hookConnected.value } ?: mainTitle.value
-    val displayCapabilities = detectDeviceCapabilities(
+    val displayCapabilities = DeviceRegistry.detectDeviceCapabilities(
         deviceName = displayTitle,
         adaptiveOverride = adaptiveCapabilityOverride.value,
         spatialAudioOverride = spatialAudioCapabilityOverride.value,

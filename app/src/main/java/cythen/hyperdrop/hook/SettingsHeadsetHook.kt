@@ -22,7 +22,7 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import cythen.hyperdrop.BuildConfig
-import cythen.hyperdrop.pods.isPuddingDeviceName
+import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import cythen.hyperdrop.utils.miuiStrongToast.data.PodParams
@@ -924,7 +924,7 @@ object SettingsHeadsetHook : HookContext() {
         val address = runCatching { device.address }.getOrNull()
         if (address != null && isOppoAddress(address)) return true
         val name = runCatching { device.name ?: device.alias }.getOrNull().orEmpty()
-        val result = isPuddingDeviceName(name)
+        val result = DeviceRegistry.isSupported(name)
         if (result && address != null) {
             knownOppoAddresses.add(address.uppercase())
             currentAddress = address

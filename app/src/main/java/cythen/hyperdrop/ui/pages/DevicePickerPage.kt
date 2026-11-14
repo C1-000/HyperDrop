@@ -139,7 +139,7 @@ fun DevicePickerPage(
     val bluetoothEnabled = adapter?.isEnabled == true
     val pairedDevices = remember(hasPermission, bluetoothEnabled, bluetoothRefreshToken) {
         if (!bluetoothEnabled) emptyList() else adapter?.bondedDevices?.toList()
-            ?.filter { cythen.hyperdrop.pods.isPuddingDeviceName(it.name ?: it.alias) }
+            ?.filter { cythen.hyperdrop.device.DeviceRegistry.isSupported(it.name ?: it.alias) }
             ?.sortedBy { it.name ?: it.alias ?: "" }
             ?: emptyList()
     }

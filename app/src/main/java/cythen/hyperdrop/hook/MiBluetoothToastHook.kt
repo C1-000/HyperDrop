@@ -25,7 +25,7 @@ import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import cythen.hyperdrop.R
 import cythen.hyperdrop.BuildConfig
-import cythen.hyperdrop.pods.detectDeviceCapabilities
+import cythen.hyperdrop.device.DeviceRegistry
 
 @SuppressLint("MissingPermission")
 object MiBluetoothToastHook : HookContext() {
@@ -282,7 +282,7 @@ object MiBluetoothToastHook : HookContext() {
                         localAncMode = p1.getIntExtra("status", 1)
                     }
                     OppoPodsAction.ACTION_CYCLE_ANC -> {
-                        val capabilities = detectDeviceCapabilities(
+                        val capabilities = DeviceRegistry.detectDeviceCapabilities(
                             deviceName = p1.getStringExtra("device_name").orEmpty(),
                             adaptiveOverride = prefs.getInt(
                                 ConfigManager.PREF_KEY_ADAPTIVE_CAPABILITY_OVERRIDE,

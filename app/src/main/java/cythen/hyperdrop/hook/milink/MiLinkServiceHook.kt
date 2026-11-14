@@ -14,7 +14,7 @@ import cythen.hyperdrop.hook.callMethod
 import cythen.hyperdrop.hook.getObjectField
 import cythen.hyperdrop.hook.setObjectField
 import cythen.hyperdrop.pods.RfcommController
-import cythen.hyperdrop.pods.detectDeviceCapabilities
+import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import cythen.hyperdrop.utils.miuiStrongToast.data.PodParams
@@ -230,7 +230,7 @@ object MiLinkServiceHook : HookContext() {
         val address = runCatching { device.address }.getOrNull()
         if (address != null && isOppoAddress(address)) return true
         val name = runCatching { device.name ?: device.alias }.getOrNull().orEmpty()
-        val result = cythen.hyperdrop.pods.isPuddingDeviceName(name)
+        val result = DeviceRegistry.isSupported(name)
         if (result && address != null) {
             knownOppoAddresses.add(address.uppercase())
             currentAddress = address
@@ -410,7 +410,7 @@ object MiLinkServiceHook : HookContext() {
         return panelCapabilities().spatialAudioSupported
     }
 
-    private fun panelCapabilities() = detectDeviceCapabilities(
+    private fun panelCapabilities() = DeviceRegistry.detectDeviceCapabilities(
         deviceName = backendDeviceName() ?: currentName.orEmpty(),
         adaptiveOverride = ConfigManager.adaptiveCapabilityOverride(),
         spatialAudioOverride = miLinkSpatialAudioOverride(),
