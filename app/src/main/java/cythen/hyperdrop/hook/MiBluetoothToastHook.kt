@@ -31,7 +31,7 @@ import cythen.hyperdrop.device.DeviceRegistry
 object MiBluetoothToastHook : HookContext() {
 
     // ANC 模式本地缓存，用于循环切换和状态同步（1=关 2=降噪 3=通透 4=自适应）
-    // 通过接收 ACTION_PODS_ANC_CHANGED 广播与 RfcommController 保持同步
+    // 通过接收 ACTION_PODS_ANC_CHANGED 广播与 DeviceSession 保持同步
     private var localAncMode = 1
 
     override fun onHook() {

@@ -40,12 +40,13 @@ import java.util.UUID
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 
+private const val TAG = "HyperDrop-DeviceSession"
+private const val AUTO_RECONNECT_DELAY_MS = 120_000L
+private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
+private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
+
 @SuppressLint("MissingPermission", "StaticFieldLeak")
-object RfcommController {
-    private const val TAG = "HyperDrop-RfcommController"
-    private const val AUTO_RECONNECT_DELAY_MS = 120_000L
-    private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
-    private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
+class DeviceSession {
 
     // Basic Objects
     private var socket: BluetoothSocket? = null
@@ -444,7 +445,7 @@ object RfcommController {
     private val routeCallback = object : MediaRouter2.RouteCallback() {
         override fun onRoutesUpdated(routes: List<MediaRoute2Info>) {
             Log.v(TAG, "routes updated: $routes")
-            this@RfcommController.routes = routes
+            this@DeviceSession.routes = routes
         }
     }
 

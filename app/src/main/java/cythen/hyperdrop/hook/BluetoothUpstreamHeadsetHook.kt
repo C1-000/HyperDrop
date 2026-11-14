@@ -14,7 +14,7 @@ import android.os.Parcel
 import java.lang.reflect.Method
 import cythen.hyperdrop.BuildConfig
 import cythen.hyperdrop.config.ConfigManager
-import cythen.hyperdrop.pods.RfcommController
+import cythen.hyperdrop.pods.SessionRegistry
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import cythen.hyperdrop.utils.miuiStrongToast.data.PodParams
@@ -655,7 +655,7 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
     }
 
     private fun realRefreshPayload(): String {
-        val localSnapshot = runCatching { RfcommController.currentStatusSnapshot() }
+        val localSnapshot = runCatching { SessionRegistry.current().currentStatusSnapshot() }
             .getOrNull()
             ?.takeIf { it.address != null || it.battery != null }
         val battery = localSnapshot?.battery ?: currentBattery
@@ -674,11 +674,11 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
             knownOppoAddresses.add(it.uppercase())
         }
         localSnapshot?.deviceName?.let { currentName = it }
-        return RfcommController.miuiRefreshPayload(battery, anc, transparencyVocalEnhancement)
+        return SessionRegistry.current().miuiRefreshPayload(battery, anc, transparencyVocalEnhancement)
     }
 
     private fun effectiveBattery(): BatteryParams? {
-        return runCatching { RfcommController.currentStatusSnapshot().battery }.getOrNull() ?: currentBattery
+        return runCatching { SessionRegistry.current().currentStatusSnapshot().battery }.getOrNull() ?: currentBattery
     }
 
     private fun displayBattery(params: PodParams?): Int? {
@@ -751,7 +751,7 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
     private fun requestBluetoothStatus(reason: String) {
         runCatching {
             if (packageName == "com.android.bluetooth") {
-                RfcommController.queryStatus()
+                SessionRegistry.current().queryStatus()
             } else {
                 context?.sendBroadcast(Intent(OppoPodsAction.ACTION_REFRESH_STATUS).apply {
                     setPackage("com.android.bluetooth")

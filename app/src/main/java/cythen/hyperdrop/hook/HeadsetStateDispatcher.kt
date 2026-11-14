@@ -11,7 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import cythen.hyperdrop.BuildConfig
-import cythen.hyperdrop.pods.RfcommController
+import cythen.hyperdrop.pods.SessionRegistry
 import cythen.hyperdrop.utils.SystemApisUtils.setIconVisibility
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 
@@ -44,10 +44,10 @@ object HeadsetStateDispatcher : HookContext() {
                 val statusBarManager = context.getSystemService("statusbar") as StatusBarManager
                 if (currState == BluetoothHeadset.STATE_CONNECTED) {
                     statusBarManager.setIconVisibility("wireless_headset", true)
-                    RfcommController.connectPod(context, device, prefs)
+                    SessionRegistry.current().connectPod(context, device, prefs)
                 } else if (currState == BluetoothHeadset.STATE_DISCONNECTING || currState == BluetoothHeadset.STATE_DISCONNECTED) {
                     statusBarManager.setIconVisibility("wireless_headset", false)
-                    RfcommController.disconnectedPod(context, device)
+                    SessionRegistry.current().disconnectedPod(context, device)
                 }
             }
         }
@@ -69,12 +69,12 @@ object HeadsetStateDispatcher : HookContext() {
                     OppoPodsAction.ACTION_CONNECT_POD_REQUEST -> {
                         val device = intent.getParcelableExtra("device", BluetoothDevice::class.java) ?: return
                         Log.d("HyperDrop", "connect request from app device=${device.name}/${device.address}")
-                        RfcommController.connectPod(context, device, prefs, appRequested = true)
+                        SessionRegistry.current().connectPod(context, device, prefs, appRequested = true)
                     }
                     OppoPodsAction.ACTION_DISCONNECT_POD_REQUEST -> {
                         val device = intent.getParcelableExtra("device", BluetoothDevice::class.java) ?: return
                         Log.d("HyperDrop", "disconnect request from app device=${device.name}/${device.address}")
-                        RfcommController.disconnectedPod(context, device)
+                        SessionRegistry.current().disconnectedPod(context, device)
                     }
                 }
             }

@@ -13,7 +13,7 @@ import cythen.hyperdrop.hook.Log
 import cythen.hyperdrop.hook.callMethod
 import cythen.hyperdrop.hook.getObjectField
 import cythen.hyperdrop.hook.setObjectField
-import cythen.hyperdrop.pods.RfcommController
+import cythen.hyperdrop.pods.SessionRegistry
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
@@ -426,7 +426,7 @@ object MiLinkServiceHook : HookContext() {
     }
 
     private fun backendDeviceName(): String? {
-        return runCatching { RfcommController.currentStatusSnapshot().deviceName }
+        return runCatching { SessionRegistry.current().currentStatusSnapshot().deviceName }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
     }
