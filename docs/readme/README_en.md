@@ -8,16 +8,14 @@
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android)](https://android.com)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
-[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
+[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203+-orange?style=flat-square)](https://hyperos.mi.com)
+[![DSH](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 **English** | **[简体中文](../../README.md)** | **[繁體中文](README_zh-TW.md)**
 
 </div>
 
 An Xposed module that provides system-level control for **MOONDROP earphones** on Xiaomi HyperOS devices. PUDDING / MD-TWS-056 is the first supported model, with more models planned.
-
-Current version: **1.0.0**  
-Application ID: `cythen.hyperdrop`
 
 ### Earphone Features
 
@@ -29,7 +27,7 @@ Application ID: `cythen.hyperdrop`
 
 ### HyperOS Integration
 
-- **Hyper Island / Focus Island** — Uses HyperOS Focus Notification to show earphone status and opens the earphone control popup when tapped.
+- **Hyper Island** — Uses HyperOS Focus Notification to show earphone status and opens the earphone control popup when tapped.
 - **Fusion Device Center** — Supports the HyperOS Device Center earphone card entry.
 - **Settings Integration** — Integrates with the HyperOS advanced headset page and system Bluetooth device settings.
 - **Model Compatibility** — Uses the internal compatibility Device ID `01010607`; no user-facing spoofed-model setting is required.
@@ -38,7 +36,7 @@ Application ID: `cythen.hyperdrop`
 
 - **Quick Popup** — Tap the Hyper Island or an earphone entry to view battery, ANC, and quick controls.
 - **Dedicated Detail Page** — Provides the PUDDING product image, battery, ANC, gain, indicator light, and app settings.
-- **Languages** — Supports Traditional Chinese, Simplified Chinese, English, and Follow System; Traditional Chinese is the default on first install.
+- **Languages** — Supports Traditional Chinese, Simplified Chinese, English, and Follow System; Follow System is the default on first install, falling back to English for unsupported locales.
 
 ### Device Support and Protocol
 
@@ -60,13 +58,12 @@ For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDI
 
 ### Credits
 
-- [HyperPods](https://github.com/Art-Chen/HyperPods) by Art_Chen — original project foundation.
+- [HyperPods](https://github.com/Art-Chen/HyperPods) — original project foundation.
 - [OppoPods](https://github.com/1812z/OppoPods) — reference for HyperOS earphone integration and implementation.
-- **HyperOriG** — reference for multi-process HyperOS integration, Focus Island, and Device Center routing.
+- [HyperOriG](https://github.com/KiriChen-Wind/HyperOriG) — reference for multi-process HyperOS integration, Focus Island, and Device Center routing.
+- [PuddingPods](https://github.com/lingbai-rong/PuddingPods) — foundation of this project.
 - [Miuix](https://github.com/YuKongA/miuix) — HyperOS-style Compose UI components.
-- Modified by **融億**  
-  Coolapk: `http://www.coolapk.com/u/30640322`
 
 ### License
 
-GPL-3.0
+[GPL-3.0](../../LICENSE)

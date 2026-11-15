@@ -8,16 +8,14 @@
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android)](https://android.com)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
-[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
+[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203+-orange?style=flat-square)](https://hyperos.mi.com)
+[![DSH](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 **[English](docs/readme/README_en.md)** | **简体中文** | **[繁體中文](docs/readme/README_zh-TW.md)**
 
 </div>
 
 为小米 HyperOS 设备提供系统级 **MOONDROP 水月雨系列耳机** 控制的 Xposed 模块；目前完成 PUDDING / MD-TWS-056，并逐步扩充其他型号。
-
-当前版本：**1.0.0**  
-应用 ID：`cythen.hyperdrop`
 
 ### 耳机功能
 
@@ -29,7 +27,7 @@
 
 ### HyperOS 集成
 
-- **超级岛 / Focus Island** — 通过 HyperOS Focus Notification 显示耳机状态，点击进入耳机控制弹窗。
+- **超级岛** — 通过 HyperOS Focus Notification 显示耳机状态，点击进入耳机控制弹窗。
 - **融合设备中心** — 支持 HyperOS 设备中心耳机卡片入口。
 - **系统设置集成** — 接入 HyperOS 高级耳机页面与系统蓝牙设备设置。
 - **型号兼容** — 内部固定使用兼容 Device ID `01010607`，无需用户手动设置伪装型号。
@@ -38,7 +36,7 @@
 
 - **快捷弹窗** — 点击超级岛或耳机入口，显示电量、降噪和快捷控制。
 - **独立详情页** — 提供 PUDDING 产品图、电量、ANC、增益、指示灯和应用设置。
-- **多语言** — 支持繁體中文、简体中文、English 和跟随系统；首次安装默认繁體中文。
+- **多语言** — 支持繁體中文、简体中文、English 和跟随系统；首次安装默认跟随系统，未命中受支持语言时回退 English。
 
 ### 设备支持与协议
 
@@ -60,13 +58,12 @@ HyperDrop 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使�
 
 ### 致谢
 
-- [HyperPods](https://github.com/Art-Chen/HyperPods) by Art_Chen — 原始项目基础。
+- [HyperPods](https://github.com/Art-Chen/HyperPods) — 原始项目基础。
 - [OppoPods](https://github.com/1812z/OppoPods) — HyperOS 耳机集成与实现参考。
-- **HyperOriG** — HyperOS 多进程接入、Focus Island 与设备卡路线参考。
+- [HyperOriG](https://github.com/KiriChen-Wind/HyperOriG) — HyperOS 多进程接入、Focus Island 与设备卡路线参考。
+- [PuddingPods](https://github.com/lingbai-rong/PuddingPods) — 本项目基础。
 - [Miuix](https://github.com/YuKongA/miuix) — HyperOS 风格 Compose UI 组件。
-- 更改者：**融億**  
-  酷安：`http://www.coolapk.com/u/30640322`
 
 ### 许可证
 
-GPL-3.0
+[GPL-3.0](LICENSE)

@@ -15,12 +15,27 @@ import cythen.hyperdrop.R
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 
+private data class Credit(val name: String, val url: String)
+
+private val CREDITS = listOf(
+    Credit("HyperPods", "https://github.com/Art-Chen/HyperPods"),
+    Credit("OppoPods", "https://github.com/1812z/OppoPods"),
+    Credit("HyperOriG", "https://github.com/KiriChen-Wind/HyperOriG"),
+    Credit("PuddingPods", "https://github.com/lingbai-rong/PuddingPods"),
+    Credit("Miuix", "https://github.com/YuKongA/miuix"),
+)
+
+private const val PROJECT_URL = "https://github.com/C1-000/HyperDrop"
+private const val LICENSE_URL = "https://github.com/C1-000/HyperDrop/blob/main/LICENSE"
+
 @Composable
 fun AboutPage(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     val context = LocalContext.current
+    val versionName = context.packageManager
+        .getPackageInfo(context.packageName, 0).versionName ?: "unknown"
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -35,49 +50,49 @@ fun AboutPage(
         item {
             Card {
                 BasicComponent(
-                    title = stringResource(R.string.modifier_credit_title),
-                    summary = stringResource(R.string.modifier_credit_summary),
-                    onClick = {
-                        Intent(Intent.ACTION_VIEW).apply {
-                            data = Uri.parse("http://www.coolapk.com/u/30640322")
-                            context.startActivity(this)
-                        }
-                    }
+                    title = stringResource(R.string.about_version),
+                    summary = versionName,
                 )
                 BasicComponent(
                     title = "HyperDrop",
-                    summary = "https://github.com/1812z/OppoPods",
+                    summary = PROJECT_URL,
                     onClick = {
                         Intent(Intent.ACTION_VIEW).apply {
-                            this.data = Uri.parse("https://github.com/1812z/OppoPods")
+                            data = Uri.parse(PROJECT_URL)
                             context.startActivity(this)
                         }
                     }
                 )
                 BasicComponent(
-                    title = "OppoPods",
-                    summary = "https://github.com/Leaf-lsgtky/OppoPods",
+                    title = stringResource(R.string.about_license),
+                    summary = "GPL-3.0",
                     onClick = {
                         Intent(Intent.ACTION_VIEW).apply {
-                            this.data = Uri.parse("https://github.com/Leaf-lsgtky/OppoPods")
+                            data = Uri.parse(LICENSE_URL)
                             context.startActivity(this)
                         }
                     }
                 )
+            }
+        }
+        item {
+            Card {
                 BasicComponent(
-                    title = stringResource(R.string.based_on),
-                    summary = "HyperPods by Art_Chen"
+                    title = stringResource(R.string.about_credits),
+                    summary = stringResource(R.string.about_credits_summary),
                 )
-                BasicComponent(
-                    title = "Github",
-                    summary = "https://github.com/Art-Chen/HyperPods",
-                    onClick = {
-                        Intent(Intent.ACTION_VIEW).apply {
-                            this.data = Uri.parse("https://github.com/Art-Chen/HyperPods")
-                            context.startActivity(this)
+                CREDITS.forEach { credit ->
+                    BasicComponent(
+                        title = credit.name,
+                        summary = credit.url,
+                        onClick = {
+                            Intent(Intent.ACTION_VIEW).apply {
+                                data = Uri.parse(credit.url)
+                                context.startActivity(this)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }

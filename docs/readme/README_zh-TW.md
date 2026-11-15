@@ -8,16 +8,14 @@
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android)](https://android.com)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
-[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
+[![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203+-orange?style=flat-square)](https://hyperos.mi.com)
+[![DSH](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
 **[English](README_en.md)** | **[简体中文](../../README.md)** | **繁體中文**
 
 </div>
 
 為小米 HyperOS 裝置提供系統級 **MOONDROP 水月雨系列耳機** 控制的 Xposed 模組；目前完成 PUDDING / MD-TWS-056，並逐步擴充其他型號。
-
-目前版本：**1.0.0**  
-應用程式 ID：`cythen.hyperdrop`
 
 ### 耳機功能
 
@@ -29,7 +27,7 @@
 
 ### HyperOS 整合
 
-- **超級島 / Focus Island** — 透過 HyperOS Focus Notification 顯示耳機狀態，點擊進入耳機控制彈窗。
+- **超級島** — 透過 HyperOS Focus Notification 顯示耳機狀態，點擊進入耳機控制彈窗。
 - **融合裝置中心** — 支援 HyperOS 裝置中心耳機卡片入口。
 - **系統設定整合** — 接入 HyperOS 高級耳機頁面與系統藍牙裝置設定。
 - **型號相容** — 內部固定使用相容 Device ID `01010607`，無需使用者手動設定偽裝型號。
@@ -38,7 +36,7 @@
 
 - **快捷彈窗** — 點擊超級島或耳機入口，顯示電量、降噪和快捷控制。
 - **獨立詳情頁** — 提供 PUDDING 產品圖、電量、ANC、增益、指示燈和應用程式設定。
-- **多語言** — 支援繁體中文、简体中文、English 和跟隨系統；首次安裝預設繁體中文。
+- **多語言** — 支援繁體中文、简体中文、English 和跟隨系統；首次安裝預設跟隨系統，未命中受支援語言時回退 English。
 
 ### 裝置支援與協定
 
@@ -60,13 +58,12 @@ HyperDrop 直接透過 Classic Bluetooth RFCOMM / SPP 與耳機通訊，並使�
 
 ### 致謝
 
-- [HyperPods](https://github.com/Art-Chen/HyperPods) by Art_Chen — 原始專案基礎。
+- [HyperPods](https://github.com/Art-Chen/HyperPods) — 原始專案基礎。
 - [OppoPods](https://github.com/1812z/OppoPods) — HyperOS 耳機整合與實作參考。
-- **HyperOriG** — HyperOS 多程序接入、Focus Island 與裝置卡路線參考。
+- [HyperOriG](https://github.com/KiriChen-Wind/HyperOriG) — HyperOS 多程序接入、Focus Island 與裝置卡路線參考。
+- [PuddingPods](https://github.com/lingbai-rong/PuddingPods) — 本專案基礎。
 - [Miuix](https://github.com/YuKongA/miuix) — HyperOS 風格 Compose UI 元件。
-- 更改者：**融億**  
-  酷安：`http://www.coolapk.com/u/30640322`
 
 ### 授權條款
 
-GPL-3.0
+[GPL-3.0](../../LICENSE)

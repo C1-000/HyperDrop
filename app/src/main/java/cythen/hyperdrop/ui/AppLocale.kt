@@ -19,8 +19,8 @@ object AppLocale {
     const val ENGLISH = 2
     const val TRADITIONAL_CHINESE = 3
 
-    // Fresh installs default to Traditional Chinese as requested.
-    const val DEFAULT = TRADITIONAL_CHINESE
+    // Follow the system locale by default; unsupported locales fall back to English.
+    const val DEFAULT = SYSTEM
 
     private var deviceLocale: Locale? = null
 
@@ -88,8 +88,8 @@ object AppLocale {
     }
 
     private fun systemLocale(): Locale {
-        return deviceLocale
-            ?: Resources.getSystem().configuration.locales[0]
-            ?: Locale.getDefault()
+        return SystemLocaleResolver.resolve(
+            deviceLocale ?: Resources.getSystem().configuration.locales[0]
+        )
     }
 }

@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">hyperdrop</string>
+    <string name="app_name">HyperDrop</string>
     <string name="app_subtitle">水月雨布丁适配 HyperOS</string>
     <string name="pod_info">耳机信息</string>
     <string name="about">关于 HyperDrop</string>
     <string name="settings">设置</string>
     <string name="module">模块</string>
     <string name="earphones">耳机</string>
-    <string name="based_on">基于</string>
+    <string name="about_version">版本</string>
+    <string name="about_license">许可证</string>
+    <string name="about_credits">致谢</string>
+    <string name="about_credits_summary">本项目基于的项目</string>
     <string name="spatial_audio">空间音频</string>
     <string name="spatial_sound">空间音效</string>
     <string name="spatial_audio_summary">选择空间音频模式</string>
@@ -127,8 +130,6 @@
     <string name="pudding_anc_basic">基础</string>
     <string name="pudding_anc_adaptive">自适应</string>
     <string name="pudding_anc_wind">抗风噪</string>
-    <string name="modifier_credit_title">更改者：融億</string>
-    <string name="modifier_credit_summary">酷安：http://www.coolapk.com/u/30640322</string>
     <string name="language_traditional">繁體中文</string>
     <string name="app_settings_entry">应用设置</string>
     <string name="app_settings_entry_summary">打开 HyperDrop 设置</string>
