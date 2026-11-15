@@ -35,7 +35,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import cythen.hyperdrop.pods.NoiseControlMode
+import cythen.hyperdrop.pods.ancModeFromUiStatus
+import cythen.hyperdrop.pods.toUiStatus
 import cythen.hyperdrop.device.DeviceRegistry
+import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.ui.AppLocale
 import cythen.hyperdrop.ui.AppTheme
@@ -70,7 +73,7 @@ class PopupActivity : ComponentActivity() {
 
         // Restore the original OppoPods/HyperOriG connection popup route.
         // The popup itself stays intact. Its "更多" uses HyperOS' official headset entry;
-        // SettingsHeadsetHook then redirects that entry to PuddingDetailActivity.
+        // SettingsHeadsetHook then redirects that entry to DeviceDetailActivity.
         val prefs = getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
         val bluetoothDevice = resolveBluetoothDevice(intent)
 
@@ -96,7 +99,7 @@ class PopupActivity : ComponentActivity() {
     @android.annotation.SuppressLint("MissingPermission")
     private fun openNativeHeadsetSettings(bluetoothDevice: BluetoothDevice?) {
         if (bluetoothDevice == null) {
-            startActivity(Intent(this, PuddingDetailActivity::class.java).apply {
+            startActivity(Intent(this, DeviceDetailActivity::class.java).apply {
                 intent.getStringExtra("bluetoothaddress")?.let { putExtra("bluetoothaddress", it) }
             })
             return
@@ -111,7 +114,7 @@ class PopupActivity : ComponentActivity() {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         runCatching { startActivity(target) }.onFailure {
-            startActivity(Intent(this, PuddingDetailActivity::class.java).apply {
+            startActivity(Intent(this, DeviceDetailActivity::class.java).apply {
                 putExtra(BluetoothDevice.EXTRA_DEVICE, bluetoothDevice)
                 putExtra("bluetoothaddress", bluetoothDevice.address)
             })
@@ -165,18 +168,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
             override fun onReceive(p0: Context?, p1: Intent?) {
                 when (p1?.action) {
                     OppoPodsAction.ACTION_PODS_ANC_CHANGED -> {
-                        val status = p1.getIntExtra("status", 1)
-                        ancMode.value = when (status) {
-                            1 -> NoiseControlMode.OFF
-                            2 -> NoiseControlMode.NOISE_CANCELLATION
-                            3 -> NoiseControlMode.TRANSPARENCY
-                            4 -> NoiseControlMode.ADAPTIVE
-                            5 -> NoiseControlMode.NOISE_CANCELLATION_SMART
-                            6 -> NoiseControlMode.NOISE_CANCELLATION_LIGHT
-                            7 -> NoiseControlMode.NOISE_CANCELLATION_MEDIUM
-                            8 -> NoiseControlMode.NOISE_CANCELLATION_DEEP
-                            else -> NoiseControlMode.OFF
-                        }
+                        ancMode.value = ancModeFromUiStatus(p1.getIntExtra("status", 1))
                     }
                     OppoPodsAction.ACTION_PODS_BATTERY_CHANGED -> {
                         batteryParams.value =
@@ -234,16 +226,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
 
     fun setAncMode(mode: NoiseControlMode) {
         ancMode.value = mode
-        val status = when (mode) {
-            NoiseControlMode.OFF -> 1
-            NoiseControlMode.NOISE_CANCELLATION -> 2
-            NoiseControlMode.TRANSPARENCY -> 3
-            NoiseControlMode.ADAPTIVE -> 4
-            NoiseControlMode.NOISE_CANCELLATION_SMART -> 5
-            NoiseControlMode.NOISE_CANCELLATION_LIGHT -> 6
-            NoiseControlMode.NOISE_CANCELLATION_MEDIUM -> 7
-            NoiseControlMode.NOISE_CANCELLATION_DEEP -> 8
-        }
+        val status = mode.toUiStatus()
         Intent(OppoPodsAction.ACTION_ANC_SELECT).apply {
             putExtra("status", status)
             setPackage("com.android.bluetooth")
@@ -286,7 +269,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onTransparencyVocalEnhancementChange = ::setTransparencyVocalEnhancement,
                     onMore = onMore,
                     onDone = { showDialog.value = false },
-                    adaptiveModeEnabled = capabilities.adaptiveSupported
+                    ancModes = capabilities.ancModes
                 )
             } else {
                 PortraitPopupBody(
@@ -297,7 +280,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onTransparencyVocalEnhancementChange = ::setTransparencyVocalEnhancement,
                     onMore = onMore,
                     onDone = { showDialog.value = false },
-                    adaptiveModeEnabled = capabilities.adaptiveSupported
+                    ancModes = capabilities.ancModes
                 )
             }
         }
@@ -313,7 +296,7 @@ private fun PortraitPopupBody(
     onTransparencyVocalEnhancementChange: (Boolean) -> Unit,
     onMore: () -> Unit,
     onDone: () -> Unit,
-    adaptiveModeEnabled: Boolean = true
+    ancModes: List<AncModeOption> = emptyList()
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -327,7 +310,7 @@ private fun PortraitPopupBody(
             AncSwitch(
                 ancStatus = ancMode,
                 onAncModeChange = onAncModeChange,
-                adaptiveModeEnabled = adaptiveModeEnabled,
+                ancModes = ancModes,
                 transparencyVocalEnhancement = transparencyVocalEnhancement,
                 onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
             )
@@ -360,7 +343,7 @@ private fun LandscapePopupBody(
     onTransparencyVocalEnhancementChange: (Boolean) -> Unit,
     onMore: () -> Unit,
     onDone: () -> Unit,
-    adaptiveModeEnabled: Boolean = true
+    ancModes: List<AncModeOption> = emptyList()
 ) {
     Row(
         modifier = Modifier
@@ -388,7 +371,7 @@ private fun LandscapePopupBody(
                     ancMode,
                     onAncModeChange = onAncModeChange,
                     compact = true,
-                    adaptiveModeEnabled = adaptiveModeEnabled,
+                    ancModes = ancModes,
                     transparencyVocalEnhancement = transparencyVocalEnhancement,
                     onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
                 )

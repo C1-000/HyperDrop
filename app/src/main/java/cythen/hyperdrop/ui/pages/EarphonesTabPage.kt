@@ -11,6 +11,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -37,7 +38,7 @@ internal fun EarphonesTabPage(
     onLedEnabledChange: (Boolean) -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
-    adaptiveModeEnabled: Boolean,
+    ancModes: List<AncModeOption>,
     boxImagePath: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
@@ -80,7 +81,7 @@ internal fun EarphonesTabPage(
                 onLedEnabledChange = onLedEnabledChange,
                 spatialAudioSupported = spatialAudioSupported,
                 spatialSoundSupported = spatialSoundSupported,
-                adaptiveModeEnabled = adaptiveModeEnabled,
+                ancModes = ancModes,
                 boxImagePath = boxImagePath,
             )
         } else {

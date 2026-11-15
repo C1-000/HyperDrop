@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
@@ -59,7 +60,7 @@ fun PodDetailPage(
     onSpatialAudioModeChange: (Int) -> Unit = {},
     spatialAudioSupported: Boolean = false,
     spatialSoundSupported: Boolean = false,
-    adaptiveModeEnabled: Boolean = true,
+    ancModes: List<AncModeOption> = emptyList(),
     eqPreset: Int = -1,
     onEqPresetChange: (Int) -> Unit = {},
     gainLevel: Int = 1,
@@ -124,7 +125,7 @@ fun PodDetailPage(
                     onSpatialAudioModeChange = onSpatialAudioModeChange,
                     spatialAudioSupported = spatialAudioSupported,
                     spatialSoundSupported = spatialSoundSupported,
-                    adaptiveModeEnabled = adaptiveModeEnabled,
+                    ancModes = ancModes,
                     eqPreset = eqPreset,
                     onEqPresetChange = onEqPresetChange,
                     gainLevel = gainLevel,
@@ -170,7 +171,7 @@ fun PodDetailPage(
             onSpatialAudioModeChange = onSpatialAudioModeChange,
             spatialAudioSupported = spatialAudioSupported,
             spatialSoundSupported = spatialSoundSupported,
-            adaptiveModeEnabled = adaptiveModeEnabled,
+            ancModes = ancModes,
             eqPreset = eqPreset,
             onEqPresetChange = onEqPresetChange,
             gainLevel = gainLevel,
@@ -212,7 +213,7 @@ private fun LazyListScope.podControlItems(
     onSpatialAudioModeChange: (Int) -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
-    adaptiveModeEnabled: Boolean,
+    ancModes: List<AncModeOption>,
     eqPreset: Int,
     onEqPresetChange: (Int) -> Unit,
     gainLevel: Int,
@@ -251,7 +252,7 @@ private fun LazyListScope.podControlItems(
                 ancStatus = ancMode,
                 onAncModeChange = onAncModeChange,
                 smartAncLevel = smartAncLevel,
-                adaptiveModeEnabled = adaptiveModeEnabled,
+                ancModes = ancModes,
                 transparencyVocalEnhancement = transparencyVocalEnhancement,
                 onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
             )

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.isNoiseCancellation
 import top.yukonga.miuix.kmp.basic.Text
@@ -52,7 +53,7 @@ fun AncSwitch(
     onAncModeChange: (NoiseControlMode) -> Unit,
     smartAncLevel: NoiseControlMode? = null,
     compact: Boolean = false,
-    adaptiveModeEnabled: Boolean = true,
+    ancModes: List<AncModeOption> = emptyList(),
     transparencyVocalEnhancement: Boolean = false,
     onTransparencyVocalEnhancementChange: ((Boolean) -> Unit)? = null
 ) {
@@ -101,17 +102,9 @@ fun AncSwitch(
             )
         }
 
-        if (ancStatus.isNoiseCancellation()) {
-            val modes = listOf(
-                NoiseControlMode.NOISE_CANCELLATION,      // Basic
-                NoiseControlMode.ADAPTIVE,                // Adaptive
-                NoiseControlMode.NOISE_CANCELLATION_SMART // Wind reduction
-            )
-            val tabs = listOf(
-                stringResource(R.string.pudding_anc_basic),
-                stringResource(R.string.pudding_anc_adaptive),
-                stringResource(R.string.pudding_anc_wind)
-            )
+        if (ancModes.isNotEmpty() && ancModes.any { it.mode == ancStatus }) {
+            val modes = ancModes.map { it.mode }
+            val tabs = ancModes.map { stringResource(it.labelRes) }
 
             AncStrengthTabRow(
                 tabs = tabs,
@@ -127,8 +120,6 @@ fun AncSwitch(
                 topPadding = if (compact) 8.dp else 16.dp
             )
         }
-
-
     }
 }
 

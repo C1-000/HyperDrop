@@ -49,6 +49,8 @@ import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.config.PodImagePrefs
 import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.pods.NoiseControlMode
+import cythen.hyperdrop.pods.ancModeFromUiStatus
+import cythen.hyperdrop.pods.toUiStatus
 import cythen.hyperdrop.pods.WearState
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.device.DeviceRegistry
@@ -248,18 +250,7 @@ fun MainUI(
                 when (p1?.action) {
                     OppoPodsAction.ACTION_PODS_ANC_CHANGED -> {
                         connectedDeviceAddress = p1.getStringExtra("address") ?: connectedDeviceAddress
-                        val status = p1.getIntExtra("status", 1)
-                        ancMode.value = when (status) {
-                            1 -> NoiseControlMode.OFF
-                            2 -> NoiseControlMode.NOISE_CANCELLATION
-                            3 -> NoiseControlMode.TRANSPARENCY
-                            4 -> NoiseControlMode.ADAPTIVE
-                            5 -> NoiseControlMode.NOISE_CANCELLATION_SMART
-                            6 -> NoiseControlMode.NOISE_CANCELLATION_LIGHT
-                            7 -> NoiseControlMode.NOISE_CANCELLATION_MEDIUM
-                            8 -> NoiseControlMode.NOISE_CANCELLATION_DEEP
-                            else -> NoiseControlMode.OFF
-                        }
+                        ancMode.value = ancModeFromUiStatus(p1.getIntExtra("status", 1))
                     }
 
                     OppoPodsAction.ACTION_PODS_SMART_ANC_LEVEL_CHANGED -> {
@@ -413,16 +404,7 @@ fun MainUI(
 
     fun setAncMode(mode: NoiseControlMode) {
         ancMode.value = mode
-        val status = when (mode) {
-            NoiseControlMode.OFF -> 1
-            NoiseControlMode.NOISE_CANCELLATION -> 2
-            NoiseControlMode.TRANSPARENCY -> 3
-            NoiseControlMode.ADAPTIVE -> 4
-            NoiseControlMode.NOISE_CANCELLATION_SMART -> 5
-            NoiseControlMode.NOISE_CANCELLATION_LIGHT -> 6
-            NoiseControlMode.NOISE_CANCELLATION_MEDIUM -> 7
-            NoiseControlMode.NOISE_CANCELLATION_DEEP -> 8
-        }
+        val status = mode.toUiStatus()
         Intent(OppoPodsAction.ACTION_ANC_SELECT).apply {
             this.putExtra("status", status)
             setPackage("com.android.bluetooth")
@@ -643,7 +625,7 @@ fun MainUI(
                 onLedEnabledChange = { setLedEnabled(it) },
                 spatialAudioSupported = displayCapabilities.spatialAudioSupported,
                 spatialSoundSupported = displayCapabilities.spatialSoundSwitchSupported,
-                adaptiveModeEnabled = displayCapabilities.adaptiveSupported,
+                ancModes = displayCapabilities.ancModes,
                 earphonePrefs = earphonePrefs.value,
                 connectedDeviceAddress = connectedDeviceAddress,
                 connectingDeviceAddress = connectingDeviceAddress,

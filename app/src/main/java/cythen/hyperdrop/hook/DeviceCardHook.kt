@@ -79,7 +79,7 @@ object DeviceCardHook : HookContext() {
                 val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
                 val device = runCatching { adapter?.getRemoteDevice(id) }.getOrNull()
                 Intent().apply {
-                    setClassName(BuildConfig.APPLICATION_ID, "cythen.hyperdrop.PuddingDetailActivity")
+                    setClassName(BuildConfig.APPLICATION_ID, "cythen.hyperdrop.DeviceDetailActivity")
                     device?.let { putExtra("android.bluetooth.device.extra.DEVICE", it) }
                     putExtra("bluetoothaddress", id)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)

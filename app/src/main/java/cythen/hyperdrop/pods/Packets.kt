@@ -68,13 +68,40 @@ enum class NoiseControlMode {
 
 fun NoiseControlMode.isNoiseCancellation(): Boolean {
     return when (this) {
-        // PUDDING exposes three ANC flavours under the single HyperOS "Noise cancellation" group.
+        // ANC flavours grouped under the single HyperOS "Noise cancellation" button.
         NoiseControlMode.NOISE_CANCELLATION,      // Basic ANC
         NoiseControlMode.ADAPTIVE,                // Adaptive ANC
         NoiseControlMode.NOISE_CANCELLATION_SMART // Wind-noise reduction
         -> true
         else -> false
     }
+}
+
+/**
+ * Single source of truth for the HyperOS "status" integer carried by
+ * ACTION_PODS_ANC_CHANGED / ACTION_ANC_SELECT broadcasts.
+ */
+fun ancModeFromUiStatus(status: Int): NoiseControlMode = when (status) {
+    1 -> NoiseControlMode.OFF
+    2 -> NoiseControlMode.NOISE_CANCELLATION
+    3 -> NoiseControlMode.TRANSPARENCY
+    4 -> NoiseControlMode.ADAPTIVE
+    5 -> NoiseControlMode.NOISE_CANCELLATION_SMART
+    6 -> NoiseControlMode.NOISE_CANCELLATION_LIGHT
+    7 -> NoiseControlMode.NOISE_CANCELLATION_MEDIUM
+    8 -> NoiseControlMode.NOISE_CANCELLATION_DEEP
+    else -> NoiseControlMode.OFF
+}
+
+fun NoiseControlMode.toUiStatus(): Int = when (this) {
+    NoiseControlMode.OFF -> 1
+    NoiseControlMode.NOISE_CANCELLATION -> 2
+    NoiseControlMode.TRANSPARENCY -> 3
+    NoiseControlMode.ADAPTIVE -> 4
+    NoiseControlMode.NOISE_CANCELLATION_SMART -> 5
+    NoiseControlMode.NOISE_CANCELLATION_LIGHT -> 6
+    NoiseControlMode.NOISE_CANCELLATION_MEDIUM -> 7
+    NoiseControlMode.NOISE_CANCELLATION_DEEP -> 8
 }
 
 /** Battery component index in response payload. */

@@ -23,8 +23,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import cythen.hyperdrop.config.ConfigManager
+import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.hook.SettingsHeadsetHook
 import cythen.hyperdrop.pods.NoiseControlMode
+import cythen.hyperdrop.pods.ancModeFromUiStatus
+import cythen.hyperdrop.pods.toUiStatus
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.AppLocale
 import cythen.hyperdrop.ui.AppTheme
@@ -45,14 +48,14 @@ import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 /**
- * One-purpose PUDDING detail screen.
+ * One-purpose device detail screen.
  *
  * Unlike MainActivity this Activity has no module tabs / floating bottom bar. HyperOS entry
  * points can jump here once, then all earbud state is fed directly by com.android.bluetooth.
- * Left/right/case battery values come from the MOONDROP GAIA response rather than Android's
+ * Left/right/case battery values come from the device's GAIA response rather than Android's
  * single generic Bluetooth battery level.
  */
-class PuddingDetailActivity : ComponentActivity() {
+class DeviceDetailActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         AppLocale.rememberDeviceLocale(newBase)
         AppLocale.apply(
@@ -93,12 +96,13 @@ class PuddingDetailActivity : ComponentActivity() {
             }
 
             AppTheme(colorSchemeMode = colorSchemeMode, accentMode = accentMode) {
-                val context = this@PuddingDetailActivity
+                val context = this@DeviceDetailActivity
                 val battery = remember { mutableStateOf(BatteryParams()) }
                 val anc = remember { mutableStateOf(NoiseControlMode.OFF) }
                 val gain = remember { mutableStateOf(1) }
                 val led = remember { mutableStateOf(true) }
                 val deviceName = remember { mutableStateOf("MOONDROP Pudding") }
+                val capabilities = DeviceRegistry.detectDeviceCapabilities(deviceName.value)
                 val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
                 val background = appBackground()
 
@@ -123,13 +127,7 @@ class PuddingDetailActivity : ComponentActivity() {
                                     intent.readThreeBatteryValues()?.let { battery.value = it }
                                 }
                                 OppoPodsAction.ACTION_PODS_ANC_CHANGED -> {
-                                    anc.value = when (intent.getIntExtra("status", 1)) {
-                                        2 -> NoiseControlMode.NOISE_CANCELLATION       // Basic
-                                        3 -> NoiseControlMode.TRANSPARENCY
-                                        4 -> NoiseControlMode.ADAPTIVE
-                                        5 -> NoiseControlMode.NOISE_CANCELLATION_SMART // Wind
-                                        else -> NoiseControlMode.OFF
-                                    }
+                                    anc.value = ancModeFromUiStatus(intent.getIntExtra("status", 1))
                                 }
                                 OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED -> {
                                     gain.value = intent.getIntExtra("level", gain.value).coerceIn(0, 2)
@@ -192,17 +190,10 @@ class PuddingDetailActivity : ComponentActivity() {
                             ancMode = anc.value,
                             onAncModeChange = { mode ->
                                 anc.value = mode
-                                val status = when (mode) {
-                                    NoiseControlMode.OFF -> 1
-                                    NoiseControlMode.NOISE_CANCELLATION -> 2
-                                    NoiseControlMode.TRANSPARENCY -> 3
-                                    NoiseControlMode.ADAPTIVE -> 4
-                                    NoiseControlMode.NOISE_CANCELLATION_SMART -> 5
-                                    else -> 2
-                                }
+                                val status = mode.toUiStatus()
                                 sendToBluetooth(OppoPodsAction.ACTION_ANC_SELECT) { putExtra("status", status) }
                             },
-                            adaptiveModeEnabled = true,
+                            ancModes = capabilities.ancModes,
                             gainLevel = gain.value,
                             onGainLevelChange = { level ->
                                 gain.value = level.coerceIn(0, 2)

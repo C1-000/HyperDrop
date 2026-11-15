@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.github.libxposed.service.XposedService
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.config.EarphonePref
 import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.pods.NoiseControlMode
@@ -95,7 +96,7 @@ internal fun MainTabsScaffold(
     onLedEnabledChange: (Boolean) -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
-    adaptiveModeEnabled: Boolean,
+    ancModes: List<AncModeOption>,
     earphonePrefs: List<EarphonePref>,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
@@ -235,7 +236,7 @@ internal fun MainTabsScaffold(
                         onLedEnabledChange = onLedEnabledChange,
                         spatialAudioSupported = spatialAudioSupported,
                         spatialSoundSupported = spatialSoundSupported,
-                        adaptiveModeEnabled = adaptiveModeEnabled,
+                        ancModes = ancModes,
                         boxImagePath = currentEarphonePref?.boxImagePath,
                         connectedDeviceAddress = connectedDeviceAddress,
                         connectingDeviceAddress = connectingDeviceAddress,
@@ -406,7 +407,7 @@ private fun EarphonesTabShell(
     onLedEnabledChange: (Boolean) -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
-    adaptiveModeEnabled: Boolean,
+    ancModes: List<AncModeOption>,
     boxImagePath: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
@@ -469,7 +470,7 @@ private fun EarphonesTabShell(
             onLedEnabledChange = onLedEnabledChange,
             spatialAudioSupported = spatialAudioSupported,
             spatialSoundSupported = spatialSoundSupported,
-            adaptiveModeEnabled = adaptiveModeEnabled,
+            ancModes = ancModes,
             boxImagePath = boxImagePath,
             connectedDeviceAddress = connectedDeviceAddress,
             connectingDeviceAddress = connectingDeviceAddress,

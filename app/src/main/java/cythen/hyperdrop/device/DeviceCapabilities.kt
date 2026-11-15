@@ -13,6 +13,8 @@ data class DeviceCapabilities(
     val spatialAudioSupported: Boolean,
     val spatialSoundSwitchSupported: Boolean,
     val ancImplementation: AncImplementation,
+    /** Selectable ANC strength tabs, in UI order. Empty means "no strength picker". */
+    val ancModes: List<AncModeOption> = emptyList(),
 ) {
     companion object {
         /** Conservative baseline for a name that matches no known model. */
@@ -21,6 +23,7 @@ data class DeviceCapabilities(
             spatialAudioSupported = false,
             spatialSoundSwitchSupported = false,
             ancImplementation = AncImplementation.STANDARD,
+            ancModes = emptyList(),
         )
     }
 }

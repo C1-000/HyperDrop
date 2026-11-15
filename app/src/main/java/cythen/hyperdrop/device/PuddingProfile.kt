@@ -1,7 +1,9 @@
 package cythen.hyperdrop.device
 
+import cythen.hyperdrop.R
 import cythen.hyperdrop.device.protocol.PuddingCommandTable
 import cythen.hyperdrop.pods.AncImplementation
+import cythen.hyperdrop.pods.NoiseControlMode
 
 /**
  * MOONDROP PUDDING / MD-TWS-056 — the first supported model.
@@ -24,6 +26,11 @@ object PuddingProfile : DeviceProfile {
         spatialAudioSupported = false,
         spatialSoundSwitchSupported = false,
         ancImplementation = AncImplementation.STANDARD,
+        ancModes = listOf(
+            AncModeOption(NoiseControlMode.NOISE_CANCELLATION, R.string.pudding_anc_basic),
+            AncModeOption(NoiseControlMode.ADAPTIVE, R.string.pudding_anc_adaptive),
+            AncModeOption(NoiseControlMode.NOISE_CANCELLATION_SMART, R.string.pudding_anc_wind),
+        ),
     )
 
     override val commandTable = PuddingCommandTable

@@ -190,7 +190,7 @@ object SettingsHeadsetHook : HookContext() {
     ) {
         redirectedNativeActivities[activity] = true
         val target = Intent().apply {
-            setClassName(MODULE_PACKAGE, "cythen.hyperdrop.PuddingDetailActivity")
+            setClassName(MODULE_PACKAGE, "cythen.hyperdrop.DeviceDetailActivity")
             device?.let { putExtra(BluetoothDevice.EXTRA_DEVICE, it) }
             if (!address.isNullOrBlank()) putExtra("bluetoothaddress", address)
             putExtra("from_hyperos_headset_entry", true)
@@ -198,7 +198,7 @@ object SettingsHeadsetHook : HookContext() {
         }
         runCatching {
             activity.startActivity(target)
-            Log.d(TAG, "official MiuiHeadsetActivity -> PuddingDetailActivity address=$address")
+            Log.d(TAG, "official MiuiHeadsetActivity -> DeviceDetailActivity address=$address")
             activity.finish()
         }.onFailure { error ->
             redirectedNativeActivities.remove(activity)

@@ -5,6 +5,7 @@ import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.PuddingProfile
 import cythen.hyperdrop.device.StandardBluetoothProfile
+import cythen.hyperdrop.pods.NoiseControlMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -41,6 +42,16 @@ class DeviceCapabilitiesTest {
         val caps = DeviceRegistry.detectDeviceCapabilities("Unknown TWS")
         assertEquals(DeviceCapabilities.NONE, caps)
         assertFalse(caps.adaptiveSupported)
+    }
+
+    @Test
+    fun `anc strength tabs come from the profile`() {
+        val caps = DeviceRegistry.detectDeviceCapabilities("MOONDROP PUDDING")
+        assertEquals(3, caps.ancModes.size)
+        assertEquals(NoiseControlMode.NOISE_CANCELLATION, caps.ancModes[0].mode)
+        assertEquals(NoiseControlMode.ADAPTIVE, caps.ancModes[1].mode)
+        assertEquals(NoiseControlMode.NOISE_CANCELLATION_SMART, caps.ancModes[2].mode)
+        assertTrue(DeviceCapabilities.NONE.ancModes.isEmpty())
     }
 
     @Test
