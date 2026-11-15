@@ -37,6 +37,17 @@ fun AboutPage(
     val versionName = context.packageManager
         .getPackageInfo(context.packageName, 0).versionName ?: "unknown"
 
+    // AppLocale.Provider exposes a createConfigurationContext wrapper (not an Activity),
+    // so starting an external Intent here requires FLAG_ACTIVITY_NEW_TASK.
+    fun openUrl(url: String) {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -56,22 +67,12 @@ fun AboutPage(
                 BasicComponent(
                     title = "HyperDrop",
                     summary = PROJECT_URL,
-                    onClick = {
-                        Intent(Intent.ACTION_VIEW).apply {
-                            data = Uri.parse(PROJECT_URL)
-                            context.startActivity(this)
-                        }
-                    }
+                    onClick = { openUrl(PROJECT_URL) }
                 )
                 BasicComponent(
                     title = stringResource(R.string.about_license),
                     summary = "GPL-3.0",
-                    onClick = {
-                        Intent(Intent.ACTION_VIEW).apply {
-                            data = Uri.parse(LICENSE_URL)
-                            context.startActivity(this)
-                        }
-                    }
+                    onClick = { openUrl(LICENSE_URL) }
                 )
             }
         }
@@ -85,12 +86,7 @@ fun AboutPage(
                     BasicComponent(
                         title = credit.name,
                         summary = credit.url,
-                        onClick = {
-                            Intent(Intent.ACTION_VIEW).apply {
-                                data = Uri.parse(credit.url)
-                                context.startActivity(this)
-                            }
-                        }
+                        onClick = { openUrl(credit.url) }
                     )
                 }
             }

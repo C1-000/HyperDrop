@@ -825,8 +825,11 @@ object SettingsHeadsetHook : HookContext() {
             val prefClass = Class.forName("androidx.preference.Preference", false, appClassLoader)
             val pref = prefClass.getConstructor(Context::class.java).newInstance(ctx)
             callMethod(pref, "setKey", APP_SETTINGS_KEY)
-            callMethod(pref, "setTitle", "应用设置")
-            callMethod(pref, "setSummary", "打开 HyperDrop 设置")
+            // Preference exposes both setTitle(int) and setTitle(CharSequence); the generic
+            // callMethod helper matches by parameter count only and picks the int overload,
+            // so resolve the CharSequence overload explicitly here (same for setSummary).
+            prefClass.getMethod("setTitle", CharSequence::class.java).invoke(pref, "应用设置")
+            prefClass.getMethod("setSummary", CharSequence::class.java).invoke(pref, "打开 HyperDrop 设置")
             val target = Intent().apply {
                 setClassName(BuildConfig.APPLICATION_ID, "cythen.hyperdrop.MainActivity")
                 putExtra("open_settings", true)
