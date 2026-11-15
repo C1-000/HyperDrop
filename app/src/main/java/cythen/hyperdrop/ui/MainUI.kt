@@ -147,6 +147,7 @@ fun MainUI(
     val moreClickAction = remember { mutableStateOf(appConfig.moreClickAction) }
     val desktopIconHidden = remember { mutableStateOf(isLauncherIconHidden(context)) }
     val logLevel = remember { mutableStateOf(appConfig.logLevel) }
+    val yieldToOfficialApp = remember { mutableStateOf(appConfig.yieldToOfficialApp) }
     val fakeDeviceId = remember { mutableStateOf(appConfig.fakeDeviceId) }
     val islandMode = remember { mutableStateOf(appConfig.islandMode) }
     val islandShowTimings = remember { mutableStateOf(appConfig.islandShowTimings) }
@@ -638,6 +639,15 @@ fun MainUI(
                 onDesktopIconHiddenChange = {
                     desktopIconHidden.value = it
                     setLauncherIconHidden(context, it)
+                },
+                yieldToOfficialApp = yieldToOfficialApp,
+                onYieldToOfficialAppChange = {
+                    yieldToOfficialApp.value = it
+                    ConfigManager.updateYieldToOfficialApp(prefs, xposedService, it)
+                    broadcastConfigChanged(context, "com.android.bluetooth")
+                    broadcastConfigChanged(context, "com.milink.service")
+                    broadcastConfigChanged(context, "com.xiaomi.bluetooth")
+                    broadcastConfigChanged(context, "com.android.settings")
                 },
                 logLevel = logLevel,
                 onLogLevelChange = {

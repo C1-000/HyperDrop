@@ -91,6 +91,8 @@
     <string name="log_level_debug">除錯</string>
     <string name="hide_desktop_icon">隱藏桌面圖示</string>
     <string name="hide_desktop_icon_summary">隱藏啟動器圖示；隱藏後請從模組管理器開啟</string>
+    <string name="yield_to_official_app">官方 App 執行時退避</string>
+    <string name="yield_to_official_app_summary">官方 MOONDROP App 執行時，讓出耳機控制通道以避免衝突。需將官方 App 加入模組作用域並重啟一次。</string>
     <string name="cycle_anc">切換降噪</string>
     <string name="adaptive_mode">自適應模式</string>
     <string name="adaptive_mode_summary">為相容耳機啟用自適應降噪模式，關閉後將隱藏該選項並禁用相關音訊處理</string>

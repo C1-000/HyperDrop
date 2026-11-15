@@ -56,6 +56,16 @@ For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDI
 3. Restart the required scopes or reboot the device.
 4. Connect a supported MOONDROP earphone (currently PUDDING / MD-TWS-056) via Bluetooth.
 
+### Coexisting with the Official App (Optional)
+
+The MOONDROP official app and HyperDrop both use the same SPP / GAIA control channel. To have HyperDrop yield the control channel while the official app is running, enable **Yield to official app** in HyperDrop settings:
+
+1. Enable the toggle in HyperDrop settings (off by default).
+2. Add the official app `com.moondroplab.moondrop.moondrop_app` to this module's LSPosed scope (included in the recommended scope list since 1.0.3).
+3. Reboot the device so the new scope takes effect.
+
+While enabled, once the official app process is alive and the earphones are connected, HyperDrop releases the RFCOMM channel, stops sending control commands, and hides its own status cards; control resumes automatically ~90 s after the official app is force-stopped. Behavior is unchanged when the app is not installed, the scope is not active, or the toggle is off.
+
 ### Credits
 
 - [HyperPods](https://github.com/Art-Chen/HyperPods) — original project foundation.

@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
 import cythen.hyperdrop.BuildConfig
+import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.pods.SessionRegistry
 import cythen.hyperdrop.utils.SystemApisUtils.setIconVisibility
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
@@ -76,6 +77,16 @@ object HeadsetStateDispatcher : HookContext() {
                         Log.d("HyperDrop", "disconnect request from app device=${device.name}/${device.address}")
                         SessionRegistry.current().disconnectedPod(context, device)
                     }
+                    OppoPodsAction.ACTION_OFFICIAL_APP_PRESENCE -> {
+                        val fromPackage = intent?.getStringExtra(OppoPodsAction.EXTRA_OFFICIAL_APP_PACKAGE)
+                        if (fromPackage == null || !ConfigManager.officialAppPackages().contains(fromPackage)) return
+                        ConfigManager.refreshFromPrefs(prefs)
+                        SessionRegistry.current().noteOfficialAppPresence()
+                    }
+                    OppoPodsAction.ACTION_CONFIG_CHANGED -> {
+                        ConfigManager.refreshFromPrefs(prefs)
+                        SessionRegistry.current().evaluateYield()
+                    }
                 }
             }
         }, IntentFilter().apply {
@@ -83,6 +94,8 @@ object HeadsetStateDispatcher : HookContext() {
             addAction(OppoPodsAction.ACTION_REFRESH_STATUS)
             addAction(OppoPodsAction.ACTION_CONNECT_POD_REQUEST)
             addAction(OppoPodsAction.ACTION_DISCONNECT_POD_REQUEST)
+            addAction(OppoPodsAction.ACTION_OFFICIAL_APP_PRESENCE)
+            addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
         }, Context.RECEIVER_EXPORTED)
         appRequestReceiverRegistered = true
     }

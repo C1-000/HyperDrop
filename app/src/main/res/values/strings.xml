@@ -90,6 +90,8 @@
     <string name="log_level_debug">Debug</string>
     <string name="hide_desktop_icon">Hide Desktop Icon</string>
     <string name="hide_desktop_icon_summary">Hide the launcher icon; open from module manager after hiding</string>
+    <string name="yield_to_official_app">Yield to Official App</string>
+    <string name="yield_to_official_app_summary">When the official MOONDROP app is running, release the earphone control channel to avoid conflicts. Requires adding the official app to the module scope and a restart.</string>
     <string name="cycle_anc">Cycle ANC</string>
     <string name="adaptive_mode">Adaptive Mode</string>
     <string name="adaptive_mode_summary">Enable Adaptive noise control mode for compatible earphones</string>

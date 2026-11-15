@@ -26,6 +26,7 @@ object MiLinkServiceHook : HookContext() {
     private val knownOppoAddresses = linkedSetOf<String>()
     internal var context: Context? = null
     private var receiverRegistered = false
+    private var controlYielded = false
     internal var currentAddress: String? = null
     private var currentName: String? = null
     private var currentBattery: BatteryParams = BatteryParams()
@@ -182,9 +183,27 @@ object MiLinkServiceHook : HookContext() {
             addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_SPATIAL_AUDIO_CHANGED)
             addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
+            addAction(OppoPodsAction.ACTION_CONTROL_YIELDED)
+            addAction(OppoPodsAction.ACTION_CONTROL_RESUMED)
         }
         context?.registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
+                val action = intent?.action
+                if (action == OppoPodsAction.ACTION_CONTROL_YIELDED) {
+                    controlYielded = true
+                    currentBattery = BatteryParams()
+                    currentAnc = 1
+                    currentSpatialAudioMode = ConfigManager.SPATIAL_AUDIO_OFF
+                    saveState(context)
+                    Log.d(TAG, "control yielded, cleared milink status")
+                    return
+                }
+                if (action == OppoPodsAction.ACTION_CONTROL_RESUMED) {
+                    controlYielded = false
+                    Log.d(TAG, "control resumed")
+                    return
+                }
+                if (controlYielded) return
                 when (intent?.action) {
                     OppoPodsAction.ACTION_CONFIG_CHANGED -> {
                         refreshConfig()

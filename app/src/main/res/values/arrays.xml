@@ -6,5 +6,6 @@
         <item>com.xiaomi.bluetooth</item>
         <item>com.android.systemui</item>
         <item>com.android.settings</item>
+        <item>com.moondroplab.moondrop.moondrop_app</item>
     </string-array>
 </resources>

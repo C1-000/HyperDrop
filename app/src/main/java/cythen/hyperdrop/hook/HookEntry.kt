@@ -34,6 +34,9 @@ class HookEntry : XposedModule() {
             "com.android.settings" -> {
                 loadHook(SettingsHeadsetHook, param.defaultClassLoader, param.packageName)
             }
+            "com.moondroplab.moondrop.moondrop_app" -> {
+                loadHook(OfficialAppPresenceHook(), param.defaultClassLoader, param.packageName)
+            }
         }
     }
 

@@ -37,6 +37,7 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
     private var hasTransparencyVocalEnhancementState = false
     private var currentAddress: String? = null
     private var currentName: String? = null
+    private var controlYielded = false
 
     override fun onHook() {
         hookHeadsetServiceBinder()
@@ -167,9 +168,27 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
             addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_TRANSPARENCY_VOCAL_ENHANCEMENT_CHANGED)
             addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
+            addAction(OppoPodsAction.ACTION_CONTROL_YIELDED)
+            addAction(OppoPodsAction.ACTION_CONTROL_RESUMED)
         }
         context?.registerReceiver(object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
+                val action = intent?.action
+                if (action == OppoPodsAction.ACTION_CONTROL_YIELDED) {
+                    controlYielded = true
+                    currentBattery = null
+                    currentAnc = 1
+                    currentTransparencyVocalEnhancement = false
+                    hasTransparencyVocalEnhancementState = false
+                    Log.d(TAG, "control yielded, cleared upstream status")
+                    return
+                }
+                if (action == OppoPodsAction.ACTION_CONTROL_RESUMED) {
+                    controlYielded = false
+                    Log.d(TAG, "control resumed")
+                    return
+                }
+                if (controlYielded) return
                 when (intent?.action) {
                     OppoPodsAction.ACTION_CONFIG_CHANGED -> {
                         refreshConfig()
@@ -616,6 +635,7 @@ class BluetoothUpstreamHeadsetHook : HookContext() {
     }
 
     private fun notifyRealStatus(reason: String) {
+        if (controlYielded) return
         val device = lastOppoDevice
         if (device != null) {
             sendRealStatus(device, reason)

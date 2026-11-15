@@ -45,6 +45,19 @@ private const val AUTO_RECONNECT_DELAY_MS = 120_000L
 private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
 private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
 
+/** UI/system write actions that must not reach the earbuds while control is yielded. */
+private val YIELD_BLOCKED_ACTIONS = setOf(
+    OppoPodsAction.ACTION_ANC_SELECT,
+    OppoPodsAction.ACTION_REFRESH_STATUS,
+    OppoPodsAction.ACTION_GAIN_LEVEL_SET,
+    OppoPodsAction.ACTION_LED_STATE_SET,
+    OppoPodsAction.ACTION_CYCLE_ANC,
+    OppoPodsAction.ACTION_RFCOMM_DEBUG_SEND,
+    OppoPodsAction.ACTION_TRANSPARENCY_VOCAL_ENHANCEMENT_SET,
+    OppoPodsAction.ACTION_SPATIAL_AUDIO_SET,
+    OppoPodsAction.ACTION_EQ_PRESET_SET,
+)
+
 @SuppressLint("MissingPermission", "StaticFieldLeak")
 class DeviceSession {
 
@@ -84,6 +97,14 @@ class DeviceSession {
     private var routeScanStarted = false
     private var appUiActive = false
     private var appUiActiveUntilMs = 0L
+
+    /** True while control has been yielded to the official MOONDROP app. */
+    private var yielded = false
+    private var yieldWatchJob: kotlinx.coroutines.Job? = null
+    /** Monotonic timestamp of the last ACTION_OFFICIAL_APP_PRESENCE received in this
+     *  (bluetooth) process. In-memory is authoritative: it avoids depending on
+     *  RemotePreferences writes from another process propagating here. */
+    private var officialAppLastSeenMs = 0L
 
     data class StatusSnapshot(
         val battery: BatteryParams?,
@@ -185,6 +206,10 @@ class DeviceSession {
     }
 
     fun handleUIEvent(intent: Intent) {
+        if (yielded && YIELD_BLOCKED_ACTIONS.contains(intent.action ?: "")) {
+            Log.d(TAG, "dropped UI event while yielded: ${intent.action}")
+            return
+        }
         when (intent.action) {
             OppoPodsAction.ACTION_GET_PODS_MAC -> {
                 if (::mDevice.isInitialized) {
@@ -211,7 +236,7 @@ class DeviceSession {
                 changeUIEqPreset(currentEqPreset)
                 changeUIGainLevel(currentGainLevel)
                 changeUILedState(currentLedEnabled)
-                if (::mDevice.isInitialized && isConnected) {
+                if (::mDevice.isInitialized && isConnected && !yielded) {
                     sendAppStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
                         this.putExtra("address", mDevice.address)
                         this.putExtra("device_name", mDevice.name ?: cachedDeviceName)
@@ -260,9 +285,17 @@ class DeviceSession {
             OppoPodsAction.ACTION_CONFIG_CHANGED -> {
                 ConfigManager.refreshFromPrefs(mPrefs)
                 Log.d(TAG, "Config synced")
+                evaluateYield()
                 if (!currentCapabilities().adaptiveSupported && currentAnc == 4) {
                     setANCMode(2)
                 }
+            }
+            OppoPodsAction.ACTION_OFFICIAL_APP_PRESENCE -> {
+                val fromPackage = intent.getStringExtra(OppoPodsAction.EXTRA_OFFICIAL_APP_PACKAGE)
+                val allowed = ConfigManager.officialAppPackages()
+                if (fromPackage == null || !allowed.contains(fromPackage)) return
+                ConfigManager.refreshFromPrefs(mPrefs)
+                noteOfficialAppPresence()
             }
             OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT -> {
                 if (!RfcommLog.isEnabled()) {
@@ -512,6 +545,7 @@ class DeviceSession {
                 this.addAction(OppoPodsAction.ACTION_LED_STATE_SET)
                 this.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                 this.addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
+                this.addAction(OppoPodsAction.ACTION_OFFICIAL_APP_PRESENCE)
                 this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT)
                 this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_DISCONNECT)
                 this.addAction(OppoPodsAction.ACTION_RFCOMM_LOG_CLEAR)
@@ -527,6 +561,8 @@ class DeviceSession {
         isConnected = true
         changeUIConnectionState("connecting")
 
+        // Decide whether the official app currently owns the channel before opening RFCOMM.
+        evaluateYield()
         connectRfcomm(initialDelayMs = 500L)
 
     }
@@ -540,6 +576,84 @@ class DeviceSession {
                     putExtra("device_name", mDevice.name ?: cachedDeviceName)
                 }
                 fill()
+                setPackage(targetPackage)
+                addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                ctx.sendBroadcast(this)
+            }
+        }
+    }
+
+    /**
+     * Re-evaluate the official-app lease and enter/leave the yielded state.
+     * Idempotent: safe to call from heartbeats, config changes, connect and the watch loop.
+     */
+    fun evaluateYield() {
+        val enabled = ConfigManager.current().yieldToOfficialApp
+        val prefsLastSeen = if (::mPrefs.isInitialized)
+            mPrefs.getLong(YieldPolicy.PREF_KEY_OFFICIAL_APP_LAST_SEEN_MS, 0L) else 0L
+        // PRESENCE broadcasts are delivered in-process and are authoritative (no
+        // dependency on RemotePreferences writes from another process propagating).
+        // Fall back to the prefs lease only when no broadcast has been received yet.
+        val lastSeen = if (officialAppLastSeenMs > 0L) officialAppLastSeenMs else prefsLastSeen
+        val officialAlive = YieldPolicy.officialAlive(SystemClock.elapsedRealtime(), lastSeen)
+        val headsetConnected = isConnected && ::mDevice.isInitialized
+        val shouldYield = YieldPolicy.shouldYield(enabled, officialAlive, headsetConnected)
+        if (shouldYield && !yielded) {
+            yieldControl()
+        } else if (!shouldYield && yielded) {
+            resumeControl()
+        }
+    }
+
+    /** Record that the official app is alive in this process, then re-evaluate. */
+    fun noteOfficialAppPresence() {
+        officialAppLastSeenMs = SystemClock.elapsedRealtime()
+        evaluateYield()
+    }
+
+    private fun yieldControl() {
+        yielded = true
+        connectionJob?.cancel()
+        reconnectJob?.cancel()
+        readerJob?.cancel()
+        reconnectPending = false
+        closeSocketOnly()
+        Log.i(TAG, "yield control: official app is alive")
+        sendControlStateBroadcast(OppoPodsAction.ACTION_CONTROL_YIELDED)
+        yieldWatchJob?.cancel()
+        yieldWatchJob = CoroutineScope(Dispatchers.IO).launch {
+            while (yielded) {
+                delay(YieldPolicy.YIELD_CHECK_INTERVAL_MS)
+                evaluateYield()
+            }
+        }
+    }
+
+    private fun resumeControl() {
+        yielded = false
+        yieldWatchJob?.cancel()
+        yieldWatchJob = null
+        Log.i(TAG, "resume control: official app lease expired")
+        sendControlStateBroadcast(OppoPodsAction.ACTION_CONTROL_RESUMED)
+        if (isConnected && ::mDevice.isInitialized) {
+            connectRfcomm(initialDelayMs = 800L)
+        }
+    }
+
+    /** Notify every L2 status consumer, including the bluetooth process itself. */
+    private fun sendControlStateBroadcast(action: String) {
+        val ctx = mContext ?: return
+        listOf(
+            "com.milink.service",
+            "com.xiaomi.bluetooth",
+            "com.android.settings",
+            "com.android.bluetooth",
+        ).forEach { targetPackage ->
+            Intent(action).apply {
+                if (::mDevice.isInitialized) {
+                    putExtra("address", mDevice.address)
+                    putExtra("device_name", mDevice.name ?: cachedDeviceName)
+                }
                 setPackage(targetPackage)
                 addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
                 ctx.sendBroadcast(this)
@@ -605,10 +719,23 @@ class DeviceSession {
         connectionJob = CoroutineScope(Dispatchers.IO).launch {
             if (initialDelayMs > 0) delay(initialDelayMs)
             if (!isConnected || !::mDevice.isInitialized) return@launch
+            if (yielded) {
+                Log.d(TAG, "RFCOMM connect skipped while yielded")
+                return@launch
+            }
             closeSocketOnly()
             try {
                 val newSocket = createRfcommSocket(mDevice)
                 newSocket.connect()
+                // A yield may have landed while connect() was blocking (cancellation
+                // does not interrupt the blocking call). Never keep a socket the
+                // official app is trying to own, and never start a reader after
+                // closeSocketOnly() ran in yieldControl().
+                if (yielded) {
+                    runCatching { newSocket.close() }
+                    Log.d(TAG, "RFCOMM socket released: yielded during connect")
+                    return@launch
+                }
                 socket = newSocket
                 reconnectAttempts.set(0)
                 reconnectPending = false
@@ -655,6 +782,7 @@ class DeviceSession {
     // explicitly opens/refreshes, or when a real ANC change triggers a battery refresh.
 
     private fun scheduleReconnect(reason: String, immediate: Boolean = false) {
+        if (yielded) return
         if (!isConnected || !::mDevice.isInitialized || mContext == null) return
         RfcommLog.w(mContext, TAG, "schedule reconnect reason=$reason immediate=$immediate")
         closeSocketOnly()
@@ -772,6 +900,9 @@ class DeviceSession {
 
     fun disconnectedPod(context: Context, device: BluetoothDevice) {
         isConnected = false
+        yielded = false
+        yieldWatchJob?.cancel()
+        yieldWatchJob = null
         connectionJob?.cancel()
         reconnectJob?.cancel()
         readerJob?.cancel()
@@ -815,6 +946,10 @@ class DeviceSession {
     }
 
     private fun sendPacketSafe(packet: ByteArray, requestReason: String? = null) {
+        if (yielded) {
+            Log.d(TAG, "dropped GAIA write while yielded")
+            return
+        }
         if (requestReason != null) reconnectNowForRequest(requestReason)
         try {
             val currentSocket = socket ?: run {

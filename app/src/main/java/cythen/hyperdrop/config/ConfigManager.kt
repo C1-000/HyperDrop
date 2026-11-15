@@ -18,6 +18,8 @@ data class AppConfig(
     val spatialAudioCapabilityOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
     val spatialSoundSwitchCapabilityOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
     val ancImplementationCapabilityOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
+    val yieldToOfficialApp: Boolean = false,
+    val officialAppPackages: List<String> = listOf(ConfigManager.DEFAULT_OFFICIAL_APP_PACKAGE),
 )
 
 object ConfigManager {
@@ -57,6 +59,7 @@ object ConfigManager {
     const val CAPABILITY_OVERRIDE_AUTO = 0
     const val CAPABILITY_OVERRIDE_FORCE_ENABLED = 1
     const val CAPABILITY_OVERRIDE_FORCE_DISABLED = 2
+    const val DEFAULT_OFFICIAL_APP_PACKAGE = "com.moondroplab.moondrop.moondrop_app"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -103,6 +106,10 @@ object ConfigManager {
     fun spatialSoundSwitchCapabilityOverride(): Int = current().spatialSoundSwitchCapabilityOverride.normalizedCapabilityOverride()
 
     fun ancImplementationCapabilityOverride(): Int = current().ancImplementationCapabilityOverride.normalizedCapabilityOverride()
+
+    fun yieldToOfficialApp(): Boolean = current().yieldToOfficialApp
+
+    fun officialAppPackages(): List<String> = current().officialAppPackages.normalizedOfficialAppPackages()
 
     fun fakeSupport(): String = "${fakeDeviceId()},000000000000000010000000"
 
@@ -158,6 +165,11 @@ object ConfigManager {
 
     fun updateAncImplementationCapabilityOverride(prefs: SharedPreferences, service: XposedService?, override: Int) {
         val config = current().copy(ancImplementationCapabilityOverride = override.normalizedCapabilityOverride())
+        save(prefs, service, config)
+    }
+
+    fun updateYieldToOfficialApp(prefs: SharedPreferences, service: XposedService?, enabled: Boolean) {
+        val config = current().copy(yieldToOfficialApp = enabled)
         save(prefs, service, config)
     }
 
@@ -253,6 +265,7 @@ object ConfigManager {
         spatialAudioCapabilityOverride = spatialAudioCapabilityOverride.normalizedCapabilityOverride(),
         spatialSoundSwitchCapabilityOverride = spatialSoundSwitchCapabilityOverride.normalizedCapabilityOverride(),
         ancImplementationCapabilityOverride = ancImplementationCapabilityOverride.normalizedCapabilityOverride(),
+        officialAppPackages = officialAppPackages.normalizedOfficialAppPackages(),
     )
 
     private fun String.normalizedFakeDeviceId(): String = DEFAULT_FAKE_DEVICE_ID
@@ -262,6 +275,9 @@ object ConfigManager {
     private fun Set<Int>.normalizedIslandShowTimings(): Set<Int> = filterTo(mutableSetOf()) {
         it in ISLAND_SHOW_TIMING_CONNECTED..ISLAND_SHOW_TIMING_IN_CASE
     }
+
+    private fun List<String>.normalizedOfficialAppPackages(): List<String> =
+        map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf(DEFAULT_OFFICIAL_APP_PACKAGE) }.distinct()
 
     private fun logConfigChange(source: String, oldConfig: AppConfig, newConfig: AppConfig) {
         val changes = changedFields(oldConfig, newConfig)
@@ -312,6 +328,12 @@ object ConfigManager {
             }
             if (oldConfig.ancImplementationCapabilityOverride != newConfig.ancImplementationCapabilityOverride) {
                 add("ancImplementationCapabilityOverride=${oldConfig.ancImplementationCapabilityOverride}->${newConfig.ancImplementationCapabilityOverride}")
+            }
+            if (oldConfig.yieldToOfficialApp != newConfig.yieldToOfficialApp) {
+                add("yieldToOfficialApp=${oldConfig.yieldToOfficialApp}->${newConfig.yieldToOfficialApp}")
+            }
+            if (oldConfig.officialAppPackages != newConfig.officialAppPackages) {
+                add("officialAppPackages=${oldConfig.officialAppPackages}->${newConfig.officialAppPackages}")
             }
         }
     }

@@ -36,4 +36,9 @@ object OppoPodsAction {
     // Adaptive模式开关状态变更广播，用于跨进程同步偏好设置（App → com.android.bluetooth / com.xiaomi.bluetooth）
     const val ACTION_ADAPTIVE_MODE_CHANGED = "cythen.hyperdrop.action.adaptive_mode_changed"
     const val ACTION_CONFIG_CHANGED = "cythen.hyperdrop.action.config_changed"
+    // 官方 App 运行时退避：进程存活心跳通知、控制通道让出/恢复广播
+    const val ACTION_OFFICIAL_APP_PRESENCE = "cythen.hyperdrop.action.official_app_presence"
+    const val ACTION_CONTROL_YIELDED = "cythen.hyperdrop.action.control_yielded"
+    const val ACTION_CONTROL_RESUMED = "cythen.hyperdrop.action.control_resumed"
+    const val EXTRA_OFFICIAL_APP_PACKAGE = "cythen.hyperdrop.extra.official_app_package"
 }
