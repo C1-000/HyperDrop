@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
 
-**[繁體中文](README.md)** | **简体中文** | **[English](README_EN.md)**
+**[English](docs/readme/README_en.md)** | **简体中文** | **[繁體中文](docs/readme/README_zh-TW.md)**
 
 </div>
 

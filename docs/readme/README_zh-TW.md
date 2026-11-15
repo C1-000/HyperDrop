@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
 
-**繁體中文** | **[简体中文](README_CN.md)** | **[English](README_EN.md)**
+**[English](README_en.md)** | **[简体中文](../../README.md)** | **繁體中文**
 
 </div>
 
@@ -44,7 +44,7 @@
 
 HyperDrop 直接透過 Classic Bluetooth RFCOMM / SPP 與耳機通訊，並使用 Qualcomm GAIA v4 控制受支援的 MOONDROP 耳機；不依賴水月雨官方 App 常駐。
 
-協定、命令、電量解析和 HyperOS 映射請見 [PUDDING_ADAPTATION.md](PUDDING_ADAPTATION.md)。
+協定、命令、電量解析和 HyperOS 映射請見 [PUDDING_ADAPTATION.md](../../PUDDING_ADAPTATION.md)。
 
 ### 系統需求
 

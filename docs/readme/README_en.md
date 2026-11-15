@@ -10,7 +10,7 @@
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-blueviolet?style=flat-square)](https://github.com/LSPosed/LSPosed)
 [![HyperOS](https://img.shields.io/badge/ROM-HyperOS%203-orange?style=flat-square)](https://hyperos.mi.com)
 
-**[繁體中文](README.md)** | **[简体中文](README_CN.md)** | **English**
+**English** | **[简体中文](../../README.md)** | **[繁體中文](README_zh-TW.md)**
 
 </div>
 
@@ -44,7 +44,7 @@ Application ID: `cythen.hyperdrop`
 
 HyperDrop communicates directly with the earphones over Classic Bluetooth RFCOMM / SPP and controls supported MOONDROP models through Qualcomm GAIA v4. The MOONDROP official app does not need to stay running.
 
-For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDING_ADAPTATION.md](PUDDING_ADAPTATION.md).
+For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDING_ADAPTATION.md](../../PUDDING_ADAPTATION.md).
 
 ### System Requirements
 
