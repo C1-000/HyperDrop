@@ -46,7 +46,7 @@ HyperDrop 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使�
 
 ### 系统要求
 
-- 小米设备，运行 **HyperOS**（Android 15+；超级岛相关功能以 HyperOS 3 为主要适配目标）。
+- 小米设备，运行 **HyperOS**（Android 15+；超级岛相关功能以 HyperOS 3+ 为主要适配目标）。
 - **LSPosed** API 版本 >= 101。
 
 ### 使用
@@ -56,15 +56,15 @@ HyperDrop 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使�
 3. 重启所需作用域或直接重启手机。
 4. 通过蓝牙连接受支持的 MOONDROP 耳机（目前为 PUDDING / MD-TWS-056）。
 
-### 与官方 App 共存（可选）
+### 与官方 App 共存
 
 水月雨官方 App 与 HyperDrop 会争用同一 SPP / GAIA 控制通道。若希望官方 App 运行时由 HyperDrop 主动让出控制通道，可在「应用设置」中开启 **官方 App 运行时退避**：
 
-1. 在 HyperDrop 设置中开启该开关（默认关闭）。
-2. 在 LSPosed 中将官方 App `com.moondroplab.moondrop.moondrop_app` 加入本模块作用域（自 1.0.3 起已加入推荐作用域列表）。
+1. 在 HyperDrop 设置中开启该开关。
+2. 在 LSPosed 中将官方 App `com.moondroplab.moondrop.moondrop_app` 加入本模块作用域。
 3. 重启手机使新作用域生效。
 
-开启后：官方 App 进程存活且耳机已连接时，HyperDrop 会释放 RFCOMM 通道、停止下发控制命令并隐藏本模块的状态卡片；强制停止官方 App 后约 12 秒自动恢复控制。未安装官方 App、作用域未生效或开关关闭时行为不变。
+开启后：官方 App 进程存活且耳机已连接时，HyperDrop 会释放 RFCOMM 通道、停止下发控制命令并隐藏本模块的状态卡片；强制停止官方 App 后约 12 秒自动恢复控制。
 
 ### 致谢
 
@@ -73,6 +73,11 @@ HyperDrop 直接通过 Classic Bluetooth RFCOMM / SPP 与耳机通信，并使�
 - [HyperOriG](https://github.com/KiriChen-Wind/HyperOriG) — HyperOS 多进程接入、Focus Island 与设备卡路线参考。
 - [PuddingPods](https://github.com/lingbai-rong/PuddingPods) — 本项目基础。
 - [Miuix](https://github.com/YuKongA/miuix) — HyperOS 风格 Compose UI 组件。
+
+### 支持
+
+如果这个项目对你有帮助请考虑支持，这会帮助我更好更快地开发，感激不尽
+<img width="3026" height="2160" alt="fbe8b85f-33cd-45c3-8e8f-af21bfeea7f7" src="https://github.com/user-attachments/assets/ac10ea9f-9173-4f14-9fe2-40762ba41877" />
 
 ### 许可证
 
