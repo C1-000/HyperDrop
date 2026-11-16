@@ -1,5 +1,6 @@
 package cythen.hyperdrop.ui.components
 
+import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -20,8 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -37,9 +41,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import cythen.hyperdrop.R
+import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.device.AncModeOption
+import cythen.hyperdrop.pods.AncStrength
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.isNoiseCancellation
+import cythen.hyperdrop.pods.toUiStatus
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -65,6 +72,30 @@ fun AncSwitch(
     val tabHeight = if (compact) 38.dp else 45.dp
     val tabSpacing = if (compact) 4.dp else 9.dp
     val tabOuterPadding = if (compact) 8.dp else 12.dp
+
+    // Remember the last ANC strength flavour so the single "Noise cancellation"
+    // button restores it instead of always falling back to basic ANC.
+    val context = LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    var lastAncStrength by remember {
+        mutableStateOf(
+            AncStrength.fromStatus(
+                prefs.getInt(AncStrength.PREF_KEY_LAST_ANC_STRENGTH, AncStrength.defaultStatus())
+            )
+        )
+    }
+    val supportedAncModes = ancModes.map { it.mode }
+    LaunchedEffect(ancStatus) {
+        if (ancStatus.isNoiseCancellation() && ancStatus != lastAncStrength) {
+            lastAncStrength = ancStatus
+            prefs.edit()
+                .putInt(AncStrength.PREF_KEY_LAST_ANC_STRENGTH, ancStatus.toUiStatus())
+                .apply()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -91,7 +122,7 @@ fun AncSwitch(
                 onIconRes = R.drawable.ic_openanc_on,
                 label = stringResource(R.string.noise_cancellation_title),
                 isSelected = ancStatus.isNoiseCancellation(),
-                onClick = { onAncModeChange(NoiseControlMode.NOISE_CANCELLATION) },
+                onClick = { onAncModeChange(AncStrength.resolveTarget(lastAncStrength, supportedAncModes)) },
                 modifier = Modifier.weight(1f),
                 compact = compact,
                 enabled = enabled
@@ -116,7 +147,16 @@ fun AncSwitch(
                 tabs = tabs,
                 selectedTabIndex = modes.indexOf(ancStatus).takeIf { it >= 0 } ?: 0,
                 assistHighlightedIndex = null,
-                onTabSelected = { if (enabled) onAncModeChange(modes[it]) },
+                onTabSelected = { index ->
+                    if (enabled) {
+                        val mode = modes[index]
+                        lastAncStrength = mode
+                        prefs.edit()
+                            .putInt(AncStrength.PREF_KEY_LAST_ANC_STRENGTH, mode.toUiStatus())
+                            .apply()
+                        onAncModeChange(mode)
+                    }
+                },
                 compact = compact,
                 minWidth = tabMinWidth,
                 tabMaxWidth = tabMaxWidth,
