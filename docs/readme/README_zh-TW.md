@@ -64,7 +64,7 @@ HyperDrop 直接透過 Classic Bluetooth RFCOMM / SPP 與耳機通訊，並使�
 2. 在 LSPosed 中將官方 App `com.moondroplab.moondrop.moondrop_app` 加入本模組作用域（自 1.0.3 起已加入建議作用域清單）。
 3. 重新啟動手機使新作用域生效。
 
-開啟後：官方 App 程序存活且耳機已連線時，HyperDrop 會釋放 RFCOMM 通道、停止下發控制命令並隱藏本模組的狀態卡片；強制停止官方 App 後約 90 秒自動恢復控制。未安裝官方 App、作用域未生效或開關關閉時行為不變。
+開啟後：官方 App 程序存活且耳機已連線時，HyperDrop 會釋放 RFCOMM 通道、停止下發控制命令並隱藏本模組的狀態卡片；強制停止官方 App 後約 12 秒自動恢復控制。未安裝官方 App、作用域未生效或開關關閉時行為不變。
 
 ### 致謝
 

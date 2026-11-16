@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.ancModeFromUiStatus
@@ -155,6 +156,9 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
     val ancMode = remember { mutableStateOf(NoiseControlMode.OFF) }
     val transparencyVocalEnhancement = remember { mutableStateOf(false) }
     val deviceName = remember { mutableStateOf("") }
+    // True while the official MOONDROP app owns the control channel and this module has
+    // released it, so the popup can show that state instead of pretending to be live.
+    val controlsYielded = remember { mutableStateOf(false) }
     val appConfig = remember { ConfigManager.refreshFromPrefs(prefs) }
     val capabilities = DeviceRegistry.detectDeviceCapabilities(
         deviceName = deviceName.value,
@@ -184,6 +188,16 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     OppoPodsAction.ACTION_PODS_TRANSPARENCY_VOCAL_ENHANCEMENT_CHANGED -> {
                         transparencyVocalEnhancement.value = p1.getBooleanExtra("enabled", false)
                     }
+                    OppoPodsAction.ACTION_CONTROL_YIELDED -> {
+                        controlsYielded.value = true
+                        // Keep showing the real product name instead of falling back to the app name.
+                        p1.getStringExtra("device_name")?.takeIf { it.isNotBlank() }?.let {
+                            deviceName.value = it
+                        }
+                    }
+                    OppoPodsAction.ACTION_CONTROL_RESUMED -> {
+                        controlsYielded.value = false
+                    }
                 }
             }
         }
@@ -196,6 +210,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
             addAction(OppoPodsAction.ACTION_PODS_CONNECTED)
             addAction(OppoPodsAction.ACTION_PODS_DISCONNECTED)
             addAction(OppoPodsAction.ACTION_PODS_TRANSPARENCY_VOCAL_ENHANCEMENT_CHANGED)
+            addAction(OppoPodsAction.ACTION_CONTROL_YIELDED)
+            addAction(OppoPodsAction.ACTION_CONTROL_RESUMED)
         }, Context.RECEIVER_EXPORTED)
 
         context.sendBroadcast(Intent(OppoPodsAction.ACTION_PODS_UI_INIT).apply {
@@ -217,6 +233,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
     LaunchedEffect(Unit) {
         while (true) {
             delay(15_000)
+            // Nothing to poll while the official app owns the control channel.
+            if (controlsYielded.value) continue
             context.sendBroadcast(Intent(OppoPodsAction.ACTION_REFRESH_STATUS).apply {
                 setPackage("com.android.bluetooth")
                 addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
@@ -269,7 +287,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onTransparencyVocalEnhancementChange = ::setTransparencyVocalEnhancement,
                     onMore = onMore,
                     onDone = { showDialog.value = false },
-                    ancModes = capabilities.ancModes
+                    ancModes = capabilities.ancModes,
+                    controlsEnabled = !controlsYielded.value
                 )
             } else {
                 PortraitPopupBody(
@@ -280,7 +299,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onTransparencyVocalEnhancementChange = ::setTransparencyVocalEnhancement,
                     onMore = onMore,
                     onDone = { showDialog.value = false },
-                    ancModes = capabilities.ancModes
+                    ancModes = capabilities.ancModes,
+                    controlsEnabled = !controlsYielded.value
                 )
             }
         }
@@ -296,7 +316,8 @@ private fun PortraitPopupBody(
     onTransparencyVocalEnhancementChange: (Boolean) -> Unit,
     onMore: () -> Unit,
     onDone: () -> Unit,
-    ancModes: List<AncModeOption> = emptyList()
+    ancModes: List<AncModeOption> = emptyList(),
+    controlsEnabled: Boolean = true
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -312,7 +333,16 @@ private fun PortraitPopupBody(
                 onAncModeChange = onAncModeChange,
                 ancModes = ancModes,
                 transparencyVocalEnhancement = transparencyVocalEnhancement,
-                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
+                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                enabled = controlsEnabled
+            )
+        }
+        if (!controlsEnabled) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.yield_to_official_app),
+                modifier = Modifier.padding(horizontal = 12.dp),
+                fontSize = 12.sp
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -343,7 +373,8 @@ private fun LandscapePopupBody(
     onTransparencyVocalEnhancementChange: (Boolean) -> Unit,
     onMore: () -> Unit,
     onDone: () -> Unit,
-    ancModes: List<AncModeOption> = emptyList()
+    ancModes: List<AncModeOption> = emptyList(),
+    controlsEnabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -373,7 +404,8 @@ private fun LandscapePopupBody(
                     compact = true,
                     ancModes = ancModes,
                     transparencyVocalEnhancement = transparencyVocalEnhancement,
-                    onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
+                    onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                    enabled = controlsEnabled
                 )
             }
         }

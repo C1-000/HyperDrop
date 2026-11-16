@@ -236,17 +236,22 @@ class DeviceSession {
                 changeUIEqPreset(currentEqPreset)
                 changeUIGainLevel(currentGainLevel)
                 changeUILedState(currentLedEnabled)
-                if (::mDevice.isInitialized && isConnected && !yielded) {
+                if (::mDevice.isInitialized && isConnected) {
+                    // Our own UI still needs to know which device is connected, otherwise the
+                    // popup title falls back to the app name. While yielded we only refresh the
+                    // in-app snapshot and never touch the channel the official app now owns.
                     sendAppStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
                         this.putExtra("address", mDevice.address)
                         this.putExtra("device_name", mDevice.name ?: cachedDeviceName)
                     }
-                    sendExternalPodsStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
-                        putExtra("device_name", mDevice.name ?: cachedDeviceName)
+                    if (!yielded) {
+                        sendExternalPodsStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
+                            putExtra("device_name", mDevice.name ?: cachedDeviceName)
+                        }
+                        // The standalone detail page always asks the earbuds themselves for fresh
+                        // left/right/case battery instead of trusting Android's single generic battery.
+                        queryStatus(immediateReconnect = false)
                     }
-                    // The standalone detail page always asks the earbuds themselves for fresh
-                    // left/right/case battery instead of trusting Android's single generic battery.
-                    queryStatus(immediateReconnect = false)
                 }
             }
             OppoPodsAction.ACTION_PODS_UI_CLOSED -> {
@@ -619,6 +624,14 @@ class DeviceSession {
         reconnectPending = false
         closeSocketOnly()
         Log.i(TAG, "yield control: official app is alive")
+        // Drop the MIUI bluetooth card: it would otherwise keep showing the last battery/ANC
+        // snapshot we pushed, which is stale once the official app owns the channel.
+        runCatching {
+            val ctx = mContext
+            if (ctx != null && ::mDevice.isInitialized) {
+                cancelPodsNotificationByMiuiBt(ctx, mDevice)
+            }
+        }.onFailure { Log.w(TAG, "cancel pods notification on yield skipped", it) }
         sendControlStateBroadcast(OppoPodsAction.ACTION_CONTROL_YIELDED)
         yieldWatchJob?.cancel()
         yieldWatchJob = CoroutineScope(Dispatchers.IO).launch {

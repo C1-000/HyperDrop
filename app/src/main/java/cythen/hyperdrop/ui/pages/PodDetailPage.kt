@@ -72,6 +72,7 @@ fun PodDetailPage(
     onOpenAppSettings: () -> Unit = {},
     showSystemSettingsEntry: Boolean = false,
     onOpenSystemSettings: () -> Unit = {},
+    controlsEnabled: Boolean = true,
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -136,6 +137,7 @@ fun PodDetailPage(
                     onOpenAppSettings = onOpenAppSettings,
                     showSystemSettingsEntry = showSystemSettingsEntry,
                     onOpenSystemSettings = onOpenSystemSettings,
+                    controlsEnabled = controlsEnabled,
                     bottomContentPadding = bottomContentPadding
                 )
             }
@@ -182,6 +184,7 @@ fun PodDetailPage(
             onOpenAppSettings = onOpenAppSettings,
             showSystemSettingsEntry = showSystemSettingsEntry,
             onOpenSystemSettings = onOpenSystemSettings,
+            controlsEnabled = controlsEnabled,
             bottomContentPadding = bottomContentPadding
         )
     }
@@ -224,6 +227,7 @@ private fun LazyListScope.podControlItems(
     onOpenAppSettings: () -> Unit,
     showSystemSettingsEntry: Boolean,
     onOpenSystemSettings: () -> Unit,
+    controlsEnabled: Boolean,
     bottomContentPadding: Dp
 ) {
     val spatialAudioValues = listOf(
@@ -254,7 +258,8 @@ private fun LazyListScope.podControlItems(
                 smartAncLevel = smartAncLevel,
                 ancModes = ancModes,
                 transparencyVocalEnhancement = transparencyVocalEnhancement,
-                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange
+                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                enabled = controlsEnabled
             )
         }
     }

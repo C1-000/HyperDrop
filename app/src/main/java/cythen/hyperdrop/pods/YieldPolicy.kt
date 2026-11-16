@@ -16,9 +16,12 @@ package cythen.hyperdrop.pods
  * processes (unlike wall-clock time it cannot jump backwards on user edits).
  */
 object YieldPolicy {
-    const val HEARTBEAT_INTERVAL_MS = 30_000L
-    const val LEASE_TIMEOUT_MS = 90_000L
-    const val YIELD_CHECK_INTERVAL_MS = 30_000L
+    // The official app exposes no reliable process-exit callback to a hooked module, so
+    // liveness is a short lease: a tight heartbeat brings the hand-back latency down to
+    // roughly LEASE_TIMEOUT_MS instead of the ~2 minutes a 30s/90s pair used to cost.
+    const val HEARTBEAT_INTERVAL_MS = 4_000L
+    const val LEASE_TIMEOUT_MS = 12_000L
+    const val YIELD_CHECK_INTERVAL_MS = 3_000L
     const val PREF_KEY_OFFICIAL_APP_LAST_SEEN_MS = "official_app_last_seen_ms"
 
     /** A lease is fresh when a heartbeat exists and is not older than the timeout.

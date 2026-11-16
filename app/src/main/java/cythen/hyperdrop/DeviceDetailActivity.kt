@@ -102,6 +102,7 @@ class DeviceDetailActivity : ComponentActivity() {
                 val gain = remember { mutableStateOf(1) }
                 val led = remember { mutableStateOf(true) }
                 val deviceName = remember { mutableStateOf("MOONDROP Pudding") }
+                val controlsYielded = remember { mutableStateOf(false) }
                 val capabilities = DeviceRegistry.detectDeviceCapabilities(deviceName.value)
                 val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
                 val background = appBackground()
@@ -135,6 +136,12 @@ class DeviceDetailActivity : ComponentActivity() {
                                 OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED -> {
                                     led.value = intent.getBooleanExtra("enabled", led.value)
                                 }
+                                OppoPodsAction.ACTION_CONTROL_YIELDED -> {
+                                    controlsYielded.value = true
+                                }
+                                OppoPodsAction.ACTION_CONTROL_RESUMED -> {
+                                    controlsYielded.value = false
+                                }
                             }
                         }
                     }
@@ -144,6 +151,8 @@ class DeviceDetailActivity : ComponentActivity() {
                         addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)
                         addAction(OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED)
                         addAction(OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED)
+                        addAction(OppoPodsAction.ACTION_CONTROL_YIELDED)
+                        addAction(OppoPodsAction.ACTION_CONTROL_RESUMED)
                     }, Context.RECEIVER_EXPORTED)
 
                     // Push cached state immediately, then query the earbuds for a fresh GAIA snapshot.
@@ -194,6 +203,7 @@ class DeviceDetailActivity : ComponentActivity() {
                                 sendToBluetooth(OppoPodsAction.ACTION_ANC_SELECT) { putExtra("status", status) }
                             },
                             ancModes = capabilities.ancModes,
+                            controlsEnabled = !controlsYielded.value,
                             gainLevel = gain.value,
                             onGainLevelChange = { level ->
                                 gain.value = level.coerceIn(0, 2)

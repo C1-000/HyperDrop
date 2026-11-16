@@ -64,7 +64,7 @@ The MOONDROP official app and HyperDrop both use the same SPP / GAIA control cha
 2. Add the official app `com.moondroplab.moondrop.moondrop_app` to this module's LSPosed scope (included in the recommended scope list since 1.0.3).
 3. Reboot the device so the new scope takes effect.
 
-While enabled, once the official app process is alive and the earphones are connected, HyperDrop releases the RFCOMM channel, stops sending control commands, and hides its own status cards; control resumes automatically ~90 s after the official app is force-stopped. Behavior is unchanged when the app is not installed, the scope is not active, or the toggle is off.
+While enabled, once the official app process is alive and the earphones are connected, HyperDrop releases the RFCOMM channel, stops sending control commands, and hides its own status cards; control resumes automatically ~12 s after the official app is force-stopped. Behavior is unchanged when the app is not installed, the scope is not active, or the toggle is off.
 
 ### Credits
 

@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
@@ -55,7 +56,8 @@ fun AncSwitch(
     compact: Boolean = false,
     ancModes: List<AncModeOption> = emptyList(),
     transparencyVocalEnhancement: Boolean = false,
-    onTransparencyVocalEnhancementChange: ((Boolean) -> Unit)? = null
+    onTransparencyVocalEnhancementChange: ((Boolean) -> Unit)? = null,
+    enabled: Boolean = true
 ) {
     val verticalPadding = if (compact) 8.dp else 16.dp
     val tabMinWidth = 0.dp
@@ -67,6 +69,7 @@ fun AncSwitch(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = verticalPadding)
+            .alpha(if (enabled) 1f else 0.45f)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -80,7 +83,8 @@ fun AncSwitch(
                 isSelected = ancStatus == NoiseControlMode.TRANSPARENCY,
                 onClick = { onAncModeChange(NoiseControlMode.TRANSPARENCY) },
                 modifier = Modifier.weight(1f),
-                compact = compact
+                compact = compact,
+                enabled = enabled
             )
             AncButton(
                 offIconRes = R.drawable.ic_openanc_off,
@@ -89,7 +93,8 @@ fun AncSwitch(
                 isSelected = ancStatus.isNoiseCancellation(),
                 onClick = { onAncModeChange(NoiseControlMode.NOISE_CANCELLATION) },
                 modifier = Modifier.weight(1f),
-                compact = compact
+                compact = compact,
+                enabled = enabled
             )
             AncButton(
                 offIconRes = R.drawable.ic_closeanc_off,
@@ -98,7 +103,8 @@ fun AncSwitch(
                 isSelected = ancStatus == NoiseControlMode.OFF,
                 onClick = { onAncModeChange(NoiseControlMode.OFF) },
                 modifier = Modifier.weight(1f),
-                compact = compact
+                compact = compact,
+                enabled = enabled
             )
         }
 
@@ -110,7 +116,7 @@ fun AncSwitch(
                 tabs = tabs,
                 selectedTabIndex = modes.indexOf(ancStatus).takeIf { it >= 0 } ?: 0,
                 assistHighlightedIndex = null,
-                onTabSelected = { onAncModeChange(modes[it]) },
+                onTabSelected = { if (enabled) onAncModeChange(modes[it]) },
                 compact = compact,
                 minWidth = tabMinWidth,
                 tabMaxWidth = tabMaxWidth,
@@ -233,7 +239,8 @@ private fun AncButton(
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val boxSize = if (compact) 40.dp else 60.dp
@@ -248,8 +255,19 @@ private fun AncButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .pressable(interactionSource = interactionSource, indication = SinkFeedback())
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .then(
+                if (enabled) {
+                    Modifier.pressable(interactionSource = interactionSource, indication = SinkFeedback())
+                } else {
+                    Modifier
+                }
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Box(
             modifier = Modifier.size(boxSize),
