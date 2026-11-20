@@ -46,6 +46,7 @@ fun SettingsPage(
     onOpenTheme: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenDeviceAdaptation: () -> Unit = {},
+    onOpenDebug: () -> Unit = {},
 ) {
     val languageValues = listOf(
         AppLocale.TRADITIONAL_CHINESE,
@@ -162,6 +163,16 @@ fun SettingsPage(
                         collapseOnSelection = false,
                     )
                 }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.padding(top = 12.dp)) {
+                BasicComponent(
+                    title = stringResource(R.string.debug_title),
+                    summary = stringResource(R.string.debug_summary),
+                    onClick = onOpenDebug
+                )
             }
         }
 

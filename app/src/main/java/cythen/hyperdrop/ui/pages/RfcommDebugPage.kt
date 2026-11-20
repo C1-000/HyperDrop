@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cythen.hyperdrop.pods.RfcommLog
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -84,8 +85,11 @@ fun RfcommDebugPage(
         }
         context.registerReceiver(receiver, IntentFilter(OppoPodsAction.ACTION_RFCOMM_LOG), Context.RECEIVER_EXPORTED)
         context.sendRfcommDebugBroadcast(OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT)
+        // A simulated device session runs inside this process, so enable the local logger too.
+        RfcommLog.setEnabled(true, context.applicationContext)
         onDispose {
             context.sendRfcommDebugBroadcast(OppoPodsAction.ACTION_RFCOMM_LOG_DISCONNECT)
+            RfcommLog.setEnabled(false)
             context.unregisterReceiver(receiver)
         }
     }
@@ -94,6 +98,7 @@ fun RfcommDebugPage(
         if (clearRequest > 0) {
             logs.clear()
             context.sendRfcommDebugBroadcast(OppoPodsAction.ACTION_RFCOMM_LOG_CLEAR)
+            RfcommLog.clear()
         }
     }
 

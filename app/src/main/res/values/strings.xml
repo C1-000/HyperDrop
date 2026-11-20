@@ -145,6 +145,24 @@
     <string name="conflict_lhdc_dual_message_dual">Turning on dual-device connection will turn off LHDC.</string>
     <string name="conflict_switch">Switch</string>
 
+    <string name="debug_title">Debug options</string>
+    <string name="debug_summary">Test multi-device support with simulated headphones</string>
+    <string name="debug_page_title">Debug options</string>
+    <string name="debug_simulate_device">Simulate a connected device</string>
+    <string name="debug_simulate_device_summary">Pick a device profile to create and connect a virtual device</string>
+    <string name="debug_added_devices">Simulated devices</string>
+    <string name="debug_added_devices_summary">Tap a row to connect or disconnect</string>
+    <string name="debug_no_added_devices">No simulated devices yet</string>
+    <string name="debug_remove_device">Remove</string>
+    <string name="debug_device_connected">Connected</string>
+    <string name="debug_device_connecting">Connecting…</string>
+    <string name="debug_device_disconnected">Disconnected</string>
+    <string name="debug_page_hint">Simulated devices show up in the device picker and answer like real hardware, including the Gaia packets they would send.</string>
+    <string name="virtual_device_section">Simulated devices</string>
+    <string name="virtual_device_badge">virtual</string>
+    <string name="verified_badge">verified</string>
+    <string name="inferred_badge">inferred</string>
+
     <string name="device_adaptation_title">Device adaptation</string>
     <string name="device_adaptation_summary">Supported models and verification status</string>
     <string name="adaptation_verified">Verified on real hardware</string>

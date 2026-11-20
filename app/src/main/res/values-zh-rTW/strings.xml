@@ -145,6 +145,24 @@
     <string name="conflict_lhdc_dual_message_dual">開啟雙裝置連線會關閉 LHDC。</string>
     <string name="conflict_switch">切換</string>
 
+    <string name="debug_title">偵錯選項</string>
+    <string name="debug_summary">用模擬耳機測試多裝置適配</string>
+    <string name="debug_page_title">偵錯選項</string>
+    <string name="debug_simulate_device">模擬連線裝置</string>
+    <string name="debug_simulate_device_summary">選擇已有檔案的機型，建立並連線虛擬裝置</string>
+    <string name="debug_added_devices">已新增的模擬裝置</string>
+    <string name="debug_added_devices_summary">點擊項目可連線或中斷</string>
+    <string name="debug_no_added_devices">還沒有模擬裝置</string>
+    <string name="debug_remove_device">移除</string>
+    <string name="debug_device_connected">已連線</string>
+    <string name="debug_device_connecting">連線中…</string>
+    <string name="debug_device_disconnected">未連線</string>
+    <string name="debug_page_hint">模擬裝置會出現在裝置選擇頁，並依所選機型的協定回放狀態，包括它「送出」的 Gaia 封包。</string>
+    <string name="virtual_device_section">模擬裝置</string>
+    <string name="virtual_device_badge">虛擬</string>
+    <string name="verified_badge">已實機驗證</string>
+    <string name="inferred_badge">協定推斷</string>
+
     <string name="device_adaptation_title">裝置適配情況</string>
     <string name="device_adaptation_summary">已適配機型與驗證狀態</string>
     <string name="adaptation_verified">實機驗證</string>

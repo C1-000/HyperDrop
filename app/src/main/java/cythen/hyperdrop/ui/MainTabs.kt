@@ -34,6 +34,7 @@ import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.device.ColorVariant
 import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.device.DeviceModels
+import cythen.hyperdrop.device.SimulatedDevice
 import cythen.hyperdrop.config.EarphonePref
 import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.pods.NoiseControlMode
@@ -117,10 +118,13 @@ internal fun MainTabsScaffold(
     earphonePrefs: List<EarphonePref>,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
+    simulatedDevices: List<SimulatedDevice>,
     showConnectErrorDialog: Boolean,
     onDeviceSelected: (BluetoothDevice) -> Unit,
     onConnectedDeviceClick: () -> Unit,
     onDeviceDisconnect: (BluetoothDevice) -> Unit,
+    onSimulatedDeviceSelect: (SimulatedDevice) -> Unit,
+    onSimulatedDeviceDisconnect: (SimulatedDevice) -> Unit,
     onDismissConnectError: () -> Unit,
     desktopIconHidden: MutableState<Boolean>,
     onDesktopIconHiddenChange: (Boolean) -> Unit,
@@ -153,6 +157,7 @@ internal fun MainTabsScaffold(
     onSavePodImages: (String, String, Map<PodImageResource, Uri?>, Set<PodImageResource>) -> Unit,
     onSaveColorVariant: (String, String, String) -> Unit,
     onOpenDeviceAdaptation: () -> Unit,
+    onOpenDebug: () -> Unit,
 ) {
     val pagerState = rememberPagerState(
         initialPage = selectedTab.ordinal,
@@ -278,11 +283,14 @@ internal fun MainTabsScaffold(
                         onOpenColorVariant = { showColorVariantDialog = true },
                         connectedDeviceAddress = connectedDeviceAddress,
                         connectingDeviceAddress = connectingDeviceAddress,
+                        simulatedDevices = simulatedDevices,
                         showConnectErrorDialog = showConnectErrorDialog,
                         pageBottomContentPadding = pageBottomContentPadding,
                         onDeviceSelected = onDeviceSelected,
                         onConnectedDeviceClick = onConnectedDeviceClick,
                         onDeviceDisconnect = onDeviceDisconnect,
+                        onSimulatedDeviceSelect = onSimulatedDeviceSelect,
+                        onSimulatedDeviceDisconnect = onSimulatedDeviceDisconnect,
                         onDismissConnectError = onDismissConnectError,
                         onBackToDevicePicker = onBackToDevicePicker,
                         onOpenPodImageConfig = { showPodImageDialog = true },
@@ -312,6 +320,7 @@ internal fun MainTabsScaffold(
                         onOpenTheme = onOpenTheme,
                         onOpenAbout = onOpenAbout,
                         onOpenDeviceAdaptation = onOpenDeviceAdaptation,
+                        onOpenDebug = onOpenDebug,
                     )
                 }
             }
@@ -466,11 +475,14 @@ private fun EarphonesTabShell(
     colorVariantKey: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
+    simulatedDevices: List<SimulatedDevice>,
     showConnectErrorDialog: Boolean,
     pageBottomContentPadding: Dp,
     onDeviceSelected: (BluetoothDevice) -> Unit,
     onConnectedDeviceClick: () -> Unit,
     onDeviceDisconnect: (BluetoothDevice) -> Unit,
+    onSimulatedDeviceSelect: (SimulatedDevice) -> Unit,
+    onSimulatedDeviceDisconnect: (SimulatedDevice) -> Unit,
     onDismissConnectError: () -> Unit,
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
@@ -544,6 +556,7 @@ private fun EarphonesTabShell(
             colorVariantKey = colorVariantKey,
             connectedDeviceAddress = connectedDeviceAddress,
             connectingDeviceAddress = connectingDeviceAddress,
+            simulatedDevices = simulatedDevices,
             showConnectErrorDialog = showConnectErrorDialog,
             contentPadding = pagePadding,
             pageBottomContentPadding = pageBottomContentPadding,
@@ -551,6 +564,8 @@ private fun EarphonesTabShell(
             onDeviceSelected = onDeviceSelected,
             onConnectedDeviceClick = onConnectedDeviceClick,
             onDeviceDisconnect = onDeviceDisconnect,
+            onSimulatedDeviceSelect = onSimulatedDeviceSelect,
+            onSimulatedDeviceDisconnect = onSimulatedDeviceDisconnect,
             onDismissConnectError = onDismissConnectError,
         )
     }
@@ -580,6 +595,7 @@ private fun SettingsTabPage(
     onOpenTheme: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenDeviceAdaptation: () -> Unit,
+    onOpenDebug: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
     Scaffold(
@@ -620,6 +636,7 @@ private fun SettingsTabPage(
             onOpenTheme = onOpenTheme,
             onOpenAbout = onOpenAbout,
             onOpenDeviceAdaptation = onOpenDeviceAdaptation,
+            onOpenDebug = onOpenDebug,
         )
     }
 }

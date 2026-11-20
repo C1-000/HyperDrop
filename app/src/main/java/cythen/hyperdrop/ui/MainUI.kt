@@ -53,9 +53,13 @@ import cythen.hyperdrop.pods.ancModeFromUiStatus
 import cythen.hyperdrop.pods.toUiStatus
 import cythen.hyperdrop.pods.WearState
 import cythen.hyperdrop.pods.WearStatus
+import cythen.hyperdrop.device.DeviceProfile
 import cythen.hyperdrop.device.DeviceRegistry
+import cythen.hyperdrop.device.SimulatedDevice
+import cythen.hyperdrop.pods.VirtualDeviceSession
 import cythen.hyperdrop.ui.pages.AboutPage
 import cythen.hyperdrop.ui.pages.AdaptationStatusPage
+import cythen.hyperdrop.ui.pages.DebugPage
 import cythen.hyperdrop.ui.pages.RfcommDebugPage
 import cythen.hyperdrop.ui.pages.ThemeSettingsPage
 import cythen.hyperdrop.utils.RootManager
@@ -85,6 +89,7 @@ sealed interface Screen : NavKey {
     data object Theme : Screen
     data object RfcommDebug : Screen
     data object DeviceAdaptation : Screen
+    data object Debug : Screen
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -175,6 +180,42 @@ fun MainUI(
     val spatialAudioCapabilityOverride = remember { mutableStateOf(appConfig.spatialAudioCapabilityOverride) }
     val spatialSoundSwitchCapabilityOverride = remember { mutableStateOf(appConfig.spatialSoundSwitchCapabilityOverride) }
     val ancImplementationCapabilityOverride = remember { mutableStateOf(appConfig.ancImplementationCapabilityOverride) }
+    val simulatedDevices = remember { mutableStateOf(appConfig.simulatedDevices) }
+
+    /** Ask whoever owns the active session to re-emit its cached state. */
+    fun requestUiSync() {
+        if (VirtualDeviceSession.isConnected()) {
+            VirtualDeviceSession.handle(context, Intent(OppoPodsAction.ACTION_PODS_UI_INIT))
+        }
+        // Always ping the hooked process as well: it answers ACTION_MODULE_BLUETOOTH_SERVICE_ALIVE,
+        // and its stale device state is filtered out by the broadcast receiver while a simulated
+        // device owns the UI.
+        sendBluetoothModuleBroadcast(context, OppoPodsAction.ACTION_PODS_UI_INIT)
+    }
+
+    /**
+     * Send a control intent to the active audio session.
+     *
+     * A simulated device lives in this process, so its session consumes the intent directly;
+     * otherwise the intent goes to the hooked Bluetooth process as before.
+     */
+    fun dispatchPodIntent(action: String, fill: Intent.() -> Unit = {}) {
+        val virtualActive = VirtualDeviceSession.isConnected() &&
+                connectedDeviceAddress.equals(VirtualDeviceSession.activeAddress(), ignoreCase = true)
+        if (virtualActive) {
+            Intent(action).apply {
+                fill()
+                VirtualDeviceSession.handle(context, this)
+            }
+            return
+        }
+        Intent(action).apply {
+            fill()
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
 
     // External entries (Settings / Xiaomi Bluetooth / MiLink / popup “更多”) open the
     // PUDDING detail immediately, then refresh live state from com.android.bluetooth.
@@ -265,7 +306,13 @@ fun MainUI(
     val broadcastReceiver = remember {
         object : BroadcastReceiver() {
             override fun onReceive(p0: Context?, p1: Intent?) {
-                when (p1?.action) {
+                val action = p1?.action ?: return
+                if (action in VIRTUAL_SESSION_ACTIONS && VirtualDeviceSession.isConnected()) {
+                    val fromSimulated = p1.getStringExtra("address")
+                        ?.equals(VirtualDeviceSession.activeAddress(), ignoreCase = true) == true
+                    if (!fromSimulated) return
+                }
+                when (action) {
                     OppoPodsAction.ACTION_PODS_ANC_CHANGED -> {
                         connectedDeviceAddress = p1.getStringExtra("address") ?: connectedDeviceAddress
                         ancMode.value = ancModeFromUiStatus(p1.getIntExtra("status", 1))
@@ -427,9 +474,12 @@ fun MainUI(
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         }, Context.RECEIVER_EXPORTED)
 
-        sendBluetoothModuleBroadcast(context, OppoPodsAction.ACTION_PODS_UI_INIT)
+        requestUiSync()
 
         onDispose {
+            if (VirtualDeviceSession.isConnected()) {
+                VirtualDeviceSession.disconnect(context, notify = false)
+            }
             sendBluetoothModuleBroadcast(context, OppoPodsAction.ACTION_PODS_UI_CLOSED)
             try {
                 context.unregisterReceiver(broadcastReceiver)
@@ -441,7 +491,7 @@ fun MainUI(
     // Event-driven status: query once when the visible app state changes. Earbud-originated ANC
     // changes are received over the existing RFCOMM reader, so no background timer is needed.
     LaunchedEffect(selectedTab, hookConnected.value) {
-        sendBluetoothModuleBroadcast(context, OppoPodsAction.ACTION_PODS_UI_INIT)
+        requestUiSync()
     }
 
     LaunchedEffect(lastBluetoothServiceAliveMs) {
@@ -456,22 +506,16 @@ fun MainUI(
         ancMode.value = mode
         markPending(pending.anc)
         val status = mode.toUiStatus()
-        Intent(OppoPodsAction.ACTION_ANC_SELECT).apply {
-            this.putExtra("status", status)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
+        dispatchPodIntent(OppoPodsAction.ACTION_ANC_SELECT) {
+            putExtra("status", status)
         }
     }
 
     fun setTransparencyVocalEnhancement(enabled: Boolean) {
         transparencyVocalEnhancement.value = enabled
         markPending(pending.transparency)
-        Intent(OppoPodsAction.ACTION_TRANSPARENCY_VOCAL_ENHANCEMENT_SET).apply {
-            this.putExtra("enabled", enabled)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
+        dispatchPodIntent(OppoPodsAction.ACTION_TRANSPARENCY_VOCAL_ENHANCEMENT_SET) {
+            putExtra("enabled", enabled)
         }
     }
 
@@ -491,6 +535,9 @@ fun MainUI(
     }
 
     fun onDeviceSelected(device: BluetoothDevice) {
+        if (VirtualDeviceSession.isConnected()) {
+            VirtualDeviceSession.disconnect(context, notify = false)
+        }
         connectingDeviceAddress = device.address
         pendingOpenEarphonesAfterPickerLoaded = false
         showConnectErrorDialog = false
@@ -510,22 +557,16 @@ fun MainUI(
         spatialAudioMode.value = normalizedMode
         markPending(pending.spatial)
         prefs.edit().putInt("spatial_audio_mode", normalizedMode).apply()
-        Intent(OppoPodsAction.ACTION_SPATIAL_AUDIO_SET).apply {
-            this.putExtra("mode", normalizedMode)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
+        dispatchPodIntent(OppoPodsAction.ACTION_SPATIAL_AUDIO_SET) {
+            putExtra("mode", normalizedMode)
         }
     }
 
     fun setEqPreset(preset: Int) {
         eqPreset.value = preset
         markPending(pending.eq)
-        Intent(OppoPodsAction.ACTION_EQ_PRESET_SET).apply {
-            this.putExtra("preset", preset)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
+        dispatchPodIntent(OppoPodsAction.ACTION_EQ_PRESET_SET) {
+            putExtra("preset", preset)
         }
     }
 
@@ -533,35 +574,26 @@ fun MainUI(
         val normalized = level.coerceIn(0, 2)
         gainLevel.value = normalized
         markPending(pending.gain)
-        Intent(OppoPodsAction.ACTION_GAIN_LEVEL_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_GAIN_LEVEL_SET) {
             putExtra("level", normalized)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
     fun setLedEnabled(enabled: Boolean) {
         ledEnabled.value = enabled
         markPending(pending.led)
-        Intent(OppoPodsAction.ACTION_LED_STATE_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_LED_STATE_SET) {
             putExtra("enabled", enabled)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
     fun setPromptTone(enabled: Boolean) {
         promptToneEnabled.value = enabled
         markPending(pending.promptTone)
-        Intent(OppoPodsAction.ACTION_PROMPT_TONE_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_PROMPT_TONE_SET) {
             putExtra("enabled", enabled)
             putExtra("volume", promptVolume.value)
             putExtra("index", 0)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
@@ -569,46 +601,34 @@ fun MainUI(
         val normalized = volume.coerceIn(0, 100)
         promptVolume.value = normalized
         markPending(pending.promptTone)
-        Intent(OppoPodsAction.ACTION_PROMPT_VOLUME_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_PROMPT_VOLUME_SET) {
             putExtra("enabled", promptToneEnabled.value)
             putExtra("volume", normalized)
             putExtra("index", 0)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
     fun setHeadTracking(enabled: Boolean) {
         headTrackingEnabled.value = enabled
         markPending(pending.headTracking)
-        Intent(OppoPodsAction.ACTION_HEAD_TRACKING_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_HEAD_TRACKING_SET) {
             putExtra("enabled", enabled)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
     fun setLhdc(enabled: Boolean) {
         lhdcEnabled.value = enabled
         markPending(pending.lhdc)
-        Intent(OppoPodsAction.ACTION_LHDC_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_LHDC_SET) {
             putExtra("enabled", enabled)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
     fun setDualConnection(enabled: Boolean) {
         dualConnectionEnabled.value = enabled
         markPending(pending.dualConnection)
-        Intent(OppoPodsAction.ACTION_DUAL_CONNECTION_SET).apply {
+        dispatchPodIntent(OppoPodsAction.ACTION_DUAL_CONNECTION_SET) {
             putExtra("enabled", enabled)
-            setPackage("com.android.bluetooth")
-            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            context.sendBroadcast(this)
         }
     }
 
@@ -642,6 +662,56 @@ fun MainUI(
         showDevicePicker = true
     }
 
+    fun connectSimulatedDevice(device: SimulatedDevice) {
+        // Leave the debug page (if it is open) so the connection progress is actually visible.
+        while (backStack.size > 1) backStack.removeLast()
+        connectingDeviceAddress = device.address
+        pendingOpenEarphonesAfterPickerLoaded = false
+        showConnectErrorDialog = false
+        showDevicePicker = false
+        selectedTab = MainTab.Earphones
+        hookConnectionState = "connecting"
+        hookConnected.value = false
+        VirtualDeviceSession.connect(context, device)
+    }
+
+    fun disconnectSimulatedDevice(device: SimulatedDevice) {
+        connectingDeviceAddress = null
+        VirtualDeviceSession.disconnect(context)
+        if (device.address.equals(connectedDeviceAddress, ignoreCase = true)) {
+            clearPodConnectionState()
+        }
+        requestUiSync()
+    }
+
+    fun removeSimulatedDevice(device: SimulatedDevice) {
+        if (device.address.equals(connectedDeviceAddress, ignoreCase = true)) {
+            disconnectSimulatedDevice(device)
+        }
+        val updated = simulatedDevices.value.filterNot { it.address.equals(device.address, ignoreCase = true) }
+        simulatedDevices.value = updated
+        ConfigManager.updateSimulatedDevices(prefs, xposedService, updated)
+    }
+
+    /** Add a simulated device backed by [profile], then connect to it right away. */
+    fun addSimulatedDevice(profile: DeviceProfile) {
+        val used = simulatedDevices.value.map { it.address.uppercase() }.toSet()
+        val address = (1..254)
+            .map { "02:00:00:00:00:" + it.toString(16).uppercase().padStart(2, '0') }
+            .firstOrNull { it !in used }
+            ?: return
+        val device = SimulatedDevice(
+            profileId = profile.id,
+            address = address,
+            displayName = profile.displayName,
+            createdAt = System.currentTimeMillis(),
+        )
+        val updated = simulatedDevices.value + device
+        simulatedDevices.value = updated
+        ConfigManager.updateSimulatedDevices(prefs, xposedService, updated)
+        connectSimulatedDevice(device)
+    }
+
     fun openBluetoothSettings() {
         val action = if (bluetoothState.enabled) Settings.ACTION_BLUETOOTH_SETTINGS else BluetoothAdapter.ACTION_REQUEST_ENABLE
         Intent(action).apply {
@@ -664,10 +734,7 @@ fun MainUI(
 
     fun refreshStatus() {
         if (hookConnected.value) {
-            context.sendBroadcast(Intent(OppoPodsAction.ACTION_REFRESH_STATUS).apply {
-                setPackage("com.android.bluetooth")
-                addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-            })
+            dispatchPodIntent(OppoPodsAction.ACTION_REFRESH_STATUS)
             Toast.makeText(context, R.string.refresh_status_toast, Toast.LENGTH_SHORT).show()
         }
     }
@@ -759,10 +826,13 @@ fun MainUI(
                 earphonePrefs = earphonePrefs.value,
                 connectedDeviceAddress = connectedDeviceAddress,
                 connectingDeviceAddress = connectingDeviceAddress,
+                simulatedDevices = simulatedDevices.value,
                 showConnectErrorDialog = showConnectErrorDialog,
                 onDeviceSelected = { onDeviceSelected(it) },
                 onConnectedDeviceClick = { onConnectedDeviceClick() },
                 onDeviceDisconnect = { onDeviceDisconnect(it) },
+                onSimulatedDeviceSelect = { connectSimulatedDevice(it) },
+                onSimulatedDeviceDisconnect = { disconnectSimulatedDevice(it) },
                 onDismissConnectError = { showConnectErrorDialog = false },
                 desktopIconHidden = desktopIconHidden,
                 onDesktopIconHiddenChange = {
@@ -828,6 +898,7 @@ fun MainUI(
                 onOpenTheme = { backStack.add(Screen.Theme) },
                 onOpenAbout = { backStack.add(Screen.About) },
                 onOpenDeviceAdaptation = { backStack.add(Screen.DeviceAdaptation) },
+                onOpenDebug = { backStack.add(Screen.Debug) },
                 showRestartScopeDialog = showRestartScopeDialog,
                 restartingScopes = restartingScopes,
                 onShowRestartScopeDialog = { showRestartScopeDialog = true },
@@ -950,6 +1021,45 @@ fun MainUI(
                 }
             }
         }
+        entry<Screen.Debug> {
+            val debugScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = stringResource(R.string.debug_page_title),
+                        largeTitle = stringResource(R.string.debug_page_title),
+                        scrollBehavior = debugScrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = { backStack.removeLast() }) {
+                                Icon(imageVector = MiuixIcons.Back, contentDescription = "Back")
+                            }
+                        }
+                    )
+                }
+            ) { padding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(backgroundColor)
+                        .padding(padding),
+                ) {
+                    DebugPage(
+                        modifier = Modifier
+                            .overScrollVertical()
+                            .nestedScroll(debugScrollBehavior.nestedScrollConnection),
+                        contentPadding = PaddingValues(bottom = pageBottomContentPadding),
+                        simulatedDevices = simulatedDevices.value,
+                        connectedAddress = connectedDeviceAddress,
+                        connectingAddress = connectingDeviceAddress,
+                        onAddProfile = { addSimulatedDevice(it) },
+                        onConnectDevice = { connectSimulatedDevice(it) },
+                        onDisconnectDevice = { disconnectSimulatedDevice(it) },
+                        onRemoveDevice = { removeSimulatedDevice(it) },
+                    )
+                }
+            }
+        }
         entry<Screen.DeviceAdaptation> {
             val adaptationScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
 
@@ -1022,6 +1132,30 @@ private fun readBluetoothState(context: Context): BluetoothSummary {
 private fun wearStateFromExtra(value: Int): WearState? {
     return WearState.fromValue(value)
 }
+
+/**
+ * Device-state broadcasts that a simulated session owns while it is connected. Any such broadcast
+ * coming from the hooked Bluetooth process (its address does not match the simulated device) is
+ * dropped so the cached real-device snapshot cannot wipe the simulated connection UI.
+ */
+private val VIRTUAL_SESSION_ACTIONS: Set<String> = setOf(
+    OppoPodsAction.ACTION_PODS_CONNECTED,
+    OppoPodsAction.ACTION_PODS_DISCONNECTED,
+    OppoPodsAction.ACTION_PODS_CONNECTION_STATE_CHANGED,
+    OppoPodsAction.ACTION_PODS_BATTERY_CHANGED,
+    OppoPodsAction.ACTION_PODS_WEAR_STATUS_CHANGED,
+    OppoPodsAction.ACTION_PODS_ANC_CHANGED,
+    OppoPodsAction.ACTION_PODS_SMART_ANC_LEVEL_CHANGED,
+    OppoPodsAction.ACTION_PODS_TRANSPARENCY_VOCAL_ENHANCEMENT_CHANGED,
+    OppoPodsAction.ACTION_PODS_SPATIAL_AUDIO_CHANGED,
+    OppoPodsAction.ACTION_PODS_EQ_PRESET_CHANGED,
+    OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED,
+    OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED,
+    OppoPodsAction.ACTION_PROMPT_TONE_CHANGED,
+    OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED,
+    OppoPodsAction.ACTION_LHDC_CHANGED,
+    OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED,
+)
 
 private fun sendBluetoothModuleBroadcast(context: Context, action: String) {
     listOf("com.android.bluetooth", "com.xiaomi.bluetooth").forEach { packageName ->

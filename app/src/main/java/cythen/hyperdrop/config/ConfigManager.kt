@@ -2,6 +2,7 @@ package cythen.hyperdrop.config
 
 import android.content.SharedPreferences
 import android.util.Log
+import cythen.hyperdrop.device.SimulatedDevice
 import io.github.libxposed.service.XposedService
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -20,6 +21,8 @@ data class AppConfig(
     val ancImplementationCapabilityOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
     val yieldToOfficialApp: Boolean = false,
     val officialAppPackages: List<String> = listOf(ConfigManager.DEFAULT_OFFICIAL_APP_PACKAGE),
+    /** Debug-only virtual devices created from existing profiles (see SimulatedDevice). */
+    val simulatedDevices: List<SimulatedDevice> = emptyList(),
 )
 
 object ConfigManager {
@@ -173,6 +176,13 @@ object ConfigManager {
         save(prefs, service, config)
     }
 
+    fun simulatedDevices(): List<SimulatedDevice> = current().simulatedDevices.normalizedSimulatedDevices()
+
+    fun updateSimulatedDevices(prefs: SharedPreferences, service: XposedService?, devices: List<SimulatedDevice>) {
+        val config = current().copy(simulatedDevices = devices.normalizedSimulatedDevices())
+        save(prefs, service, config)
+    }
+
     fun save(prefs: SharedPreferences, config: AppConfig) {
         val oldConfig = cachedConfig
         val normalized = config.copy(fakeDeviceId = config.fakeDeviceId.normalizedFakeDeviceId())
@@ -266,6 +276,7 @@ object ConfigManager {
         spatialSoundSwitchCapabilityOverride = spatialSoundSwitchCapabilityOverride.normalizedCapabilityOverride(),
         ancImplementationCapabilityOverride = ancImplementationCapabilityOverride.normalizedCapabilityOverride(),
         officialAppPackages = officialAppPackages.normalizedOfficialAppPackages(),
+        simulatedDevices = simulatedDevices.normalizedSimulatedDevices(),
     )
 
     private fun String.normalizedFakeDeviceId(): String = DEFAULT_FAKE_DEVICE_ID
@@ -278,6 +289,20 @@ object ConfigManager {
 
     private fun List<String>.normalizedOfficialAppPackages(): List<String> =
         map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf(DEFAULT_OFFICIAL_APP_PACKAGE) }.distinct()
+
+    private fun List<SimulatedDevice>.normalizedSimulatedDevices(): List<SimulatedDevice> =
+        mapNotNull { device ->
+            val profileId = device.profileId.trim()
+            val address = device.address.trim().uppercase()
+            val displayName = device.displayName.trim()
+            if (profileId.isEmpty() || displayName.isEmpty() || !MAC_ADDRESS_REGEX.matches(address)) {
+                null
+            } else {
+                device.copy(profileId = profileId, address = address, displayName = displayName)
+            }
+        }.distinctBy { it.address }
+
+    private val MAC_ADDRESS_REGEX = Regex("^([0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     private fun logConfigChange(source: String, oldConfig: AppConfig, newConfig: AppConfig) {
         val changes = changedFields(oldConfig, newConfig)
@@ -334,6 +359,9 @@ object ConfigManager {
             }
             if (oldConfig.officialAppPackages != newConfig.officialAppPackages) {
                 add("officialAppPackages=${oldConfig.officialAppPackages}->${newConfig.officialAppPackages}")
+            }
+            if (oldConfig.simulatedDevices != newConfig.simulatedDevices) {
+                add("simulatedDevices=${oldConfig.simulatedDevices}->${newConfig.simulatedDevices}")
             }
         }
     }

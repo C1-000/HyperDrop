@@ -146,6 +146,24 @@
     <string name="conflict_lhdc_dual_message_dual">开启双设备连接会关闭 LHDC。</string>
     <string name="conflict_switch">切换</string>
 
+    <string name="debug_title">调试选项</string>
+    <string name="debug_summary">用模拟耳机测试多设备适配</string>
+    <string name="debug_page_title">调试选项</string>
+    <string name="debug_simulate_device">模拟连接设备</string>
+    <string name="debug_simulate_device_summary">选择已有档案的机型，创建并连接虚拟设备</string>
+    <string name="debug_added_devices">已添加的模拟设备</string>
+    <string name="debug_added_devices_summary">点击条目可连接或断开</string>
+    <string name="debug_no_added_devices">还没有模拟设备</string>
+    <string name="debug_remove_device">移除</string>
+    <string name="debug_device_connected">已连接</string>
+    <string name="debug_device_connecting">连接中…</string>
+    <string name="debug_device_disconnected">未连接</string>
+    <string name="debug_page_hint">模拟设备会出现在设备选择页，并按所选机型的协议回放状态，包括它“发送”的 Gaia 数据包。</string>
+    <string name="virtual_device_section">模拟设备</string>
+    <string name="virtual_device_badge">虚拟</string>
+    <string name="verified_badge">已实机验证</string>
+    <string name="inferred_badge">协议推断</string>
+
     <string name="device_adaptation_title">设备适配情况</string>
     <string name="device_adaptation_summary">已适配机型与验证状态</string>
     <string name="adaptation_verified">实机验证</string>

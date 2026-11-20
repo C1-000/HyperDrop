@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.DeviceRegistry
+import cythen.hyperdrop.device.SimulatedDevice
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -70,11 +72,14 @@ fun DevicePickerPage(
     connectedDeviceAddress: String = "",
     connectingDeviceAddress: String? = null,
     showConnectError: Boolean = false,
+    simulatedDevices: List<SimulatedDevice> = emptyList(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
     bottomContentPadding: Dp = 16.dp,
     onDeviceSelected: (BluetoothDevice) -> Unit,
     onConnectedDeviceClick: () -> Unit = {},
     onDeviceDisconnect: (BluetoothDevice) -> Unit = {},
+    onSimulatedDeviceSelect: (SimulatedDevice) -> Unit = {},
+    onSimulatedDeviceDisconnect: (SimulatedDevice) -> Unit = {},
     onDismissConnectError: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -118,30 +123,14 @@ fun DevicePickerPage(
         }
     }
 
-    if (!hasPermission) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(stringResource(R.string.bt_permission_required))
-                Spacer(Modifier.height(16.dp))
-                TextButton(
-                    text = stringResource(R.string.grant_permission),
-                    onClick = {
-                        permissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                    }
-                )
-            }
-        }
-        return
-    }
-
     val btManager = context.getSystemService(BluetoothManager::class.java)
     val adapter = btManager?.adapter
-    val bluetoothEnabled = adapter?.isEnabled == true
+    val bluetoothEnabled = hasPermission && adapter?.isEnabled == true
     val pairedDevices = remember(hasPermission, bluetoothEnabled, bluetoothRefreshToken) {
-        if (!bluetoothEnabled) emptyList() else adapter?.bondedDevices?.toList()
-            ?.filter { cythen.hyperdrop.device.DeviceRegistry.isSupported(it.name ?: it.alias) }
-            ?.sortedBy { it.name ?: it.alias ?: "" }
-            ?: emptyList()
+        val bonded = if (!hasPermission || !bluetoothEnabled) null else adapter?.bondedDevices
+        bonded.orEmpty()
+            .filter { DeviceRegistry.isSupported(it.name ?: it.alias) }
+            .sortedBy { it.name ?: it.alias ?: "" }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -172,6 +161,28 @@ fun DevicePickerPage(
                     }
                 }
             }
+            if (simulatedDevices.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.virtual_device_section),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    )
+                }
+                items(simulatedDevices, key = { "virtual-${it.address}" }) { device ->
+                    val connected = device.address.equals(connectedDeviceAddress, ignoreCase = true)
+                    DeviceRow(
+                        title = device.displayName,
+                        summary = "${device.address} · ${stringResource(R.string.virtual_device_badge)}",
+                        connected = connected,
+                        connecting = connectingDeviceAddress != null &&
+                            device.address.equals(connectingDeviceAddress, ignoreCase = true),
+                        onClick = { if (connected) onConnectedDeviceClick() else onSimulatedDeviceSelect(device) },
+                        onDisconnect = { onSimulatedDeviceDisconnect(device) },
+                    )
+                }
+            }
             if (pairedDevices.isEmpty()) {
                 item {
                     Box(
@@ -180,14 +191,31 @@ fun DevicePickerPage(
                             .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = stringResource(
-                                if (bluetoothEnabled) R.string.no_paired_devices else R.string.bluetooth_disabled
-                            ),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (!hasPermission) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = stringResource(R.string.bt_permission_required),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                TextButton(
+                                    text = stringResource(R.string.grant_permission),
+                                    onClick = {
+                                        permissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                                    }
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = stringResource(
+                                    if (bluetoothEnabled) R.string.no_paired_devices else R.string.bluetooth_disabled
+                                ),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
