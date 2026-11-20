@@ -31,7 +31,6 @@ import androidx.compose.ui.zIndex
 import io.github.libxposed.service.XposedService
 import cythen.hyperdrop.R
 import cythen.hyperdrop.device.AncModeOption
-import cythen.hyperdrop.device.ColorVariant
 import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.device.DeviceModels
 import cythen.hyperdrop.device.SimulatedDevice
@@ -42,7 +41,6 @@ import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.dialogs.RestartScope
 import cythen.hyperdrop.ui.dialogs.RestartScopeDialog
 import cythen.hyperdrop.ui.dialogs.PodImageConfigDialog
-import cythen.hyperdrop.ui.dialogs.ColorVariantDialog
 import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.ui.pages.EarphonesTabPage
 import cythen.hyperdrop.ui.pages.HomePage
@@ -62,7 +60,6 @@ import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Months
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.icon.extended.Theme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
@@ -155,7 +152,6 @@ internal fun MainTabsScaffold(
     onBackToDevicePicker: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
     onSavePodImages: (String, String, Map<PodImageResource, Uri?>, Set<PodImageResource>) -> Unit,
-    onSaveColorVariant: (String, String, String) -> Unit,
     onOpenDeviceAdaptation: () -> Unit,
     onOpenDebug: () -> Unit,
 ) {
@@ -174,9 +170,7 @@ internal fun MainTabsScaffold(
         it.address.equals(connectedDeviceAddress, ignoreCase = true)
     }
     val currentProfile = DeviceModels.match(displayTitle)
-    val colorVariants: List<ColorVariant> = currentProfile?.colorVariants.orEmpty()
     var showPodImageDialog by remember { mutableStateOf(false) }
-    var showColorVariantDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedTab) {
         val targetPage = selectedTab.ordinal
@@ -279,8 +273,6 @@ internal fun MainTabsScaffold(
                         ancModes = ancModes,
                         boxImagePath = currentEarphonePref?.boxImagePath,
                         deviceImageKey = currentProfile?.imageKey,
-                        colorVariantKey = currentEarphonePref?.colorVariant,
-                        onOpenColorVariant = { showColorVariantDialog = true },
                         connectedDeviceAddress = connectedDeviceAddress,
                         connectingDeviceAddress = connectingDeviceAddress,
                         simulatedDevices = simulatedDevices,
@@ -329,7 +321,6 @@ internal fun MainTabsScaffold(
                 LandscapeDetailActions(
                     onBackToDevicePicker = onBackToDevicePicker,
                     onOpenPodImageConfig = { showPodImageDialog = true },
-                    onOpenColorVariant = { showColorVariantDialog = true },
                     onRefreshStatus = onRefreshStatus,
                     onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                 )
@@ -353,15 +344,6 @@ internal fun MainTabsScaffold(
                 onSavePodImages(address, name, images, clearedImages)
                 showPodImageDialog = false
             },
-        )
-
-        ColorVariantDialog(
-            show = showColorVariantDialog && colorVariants.size > 1,
-            deviceName = displayTitle,
-            variants = colorVariants,
-            selectedKey = currentEarphonePref?.colorVariant,
-            onDismissRequest = { showColorVariantDialog = false },
-            onSelected = { key -> onSaveColorVariant(connectedDeviceAddress, displayTitle, key) },
         )
 
         }
@@ -472,7 +454,6 @@ private fun EarphonesTabShell(
     ancModes: List<AncModeOption>,
     boxImagePath: String?,
     deviceImageKey: String?,
-    colorVariantKey: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
     simulatedDevices: List<SimulatedDevice>,
@@ -486,7 +467,6 @@ private fun EarphonesTabShell(
     onDismissConnectError: () -> Unit,
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
-    onOpenColorVariant: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
@@ -508,7 +488,6 @@ private fun EarphonesTabShell(
                         if (showEarphoneDetail) {
                             EarphoneDetailActions(
                                 onOpenPodImageConfig = onOpenPodImageConfig,
-                                onOpenColorVariant = onOpenColorVariant,
                                 onRefreshStatus = onRefreshStatus,
                                 onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                             )
@@ -553,7 +532,6 @@ private fun EarphonesTabShell(
             ancModes = ancModes,
             boxImagePath = boxImagePath,
             deviceImageKey = deviceImageKey,
-            colorVariantKey = colorVariantKey,
             connectedDeviceAddress = connectedDeviceAddress,
             connectingDeviceAddress = connectingDeviceAddress,
             simulatedDevices = simulatedDevices,
@@ -645,7 +623,6 @@ private fun SettingsTabPage(
 private fun LandscapeDetailActions(
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
-    onOpenColorVariant: () -> Unit,
     onRefreshStatus: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
@@ -661,25 +638,13 @@ private fun LandscapeDetailActions(
         IconButton(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 152.dp)
+                .padding(top = 8.dp, end = 104.dp)
                 .zIndex(1f),
             onClick = onRefreshStatus,
         ) {
             Icon(
                 imageVector = MiuixIcons.Refresh,
                 contentDescription = stringResource(R.string.refresh_status),
-            )
-        }
-        IconButton(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 104.dp)
-                .zIndex(1f),
-            onClick = onOpenColorVariant,
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Theme,
-                contentDescription = stringResource(R.string.color_variant_title),
             )
         }
         IconButton(
@@ -712,7 +677,6 @@ private fun LandscapeDetailActions(
 @Composable
 private fun EarphoneDetailActions(
     onOpenPodImageConfig: () -> Unit,
-    onOpenColorVariant: () -> Unit,
     onRefreshStatus: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
@@ -720,13 +684,6 @@ private fun EarphoneDetailActions(
         Icon(
             imageVector = MiuixIcons.Refresh,
             contentDescription = stringResource(R.string.refresh_status),
-        )
-    }
-    IconButton(onClick = onOpenColorVariant) {
-        Icon(
-            imageVector = MiuixIcons.Theme,
-            modifier = Modifier.size(23.dp),
-            contentDescription = stringResource(R.string.color_variant_title),
         )
     }
     IconButton(onClick = onOpenPodImageConfig) {

@@ -22,8 +22,6 @@ data class EarphonePref(
     val boxImagePath: String? = null,
     val leftImagePath: String? = null,
     val rightImagePath: String? = null,
-    /** Selected built-in colourway key (e.g. "black"); null = model default. */
-    val colorVariant: String? = null,
     val lastConnectedAt: Long = System.currentTimeMillis(),
 ) {
     fun imagePath(resource: PodImageResource): String? = when (resource) {
@@ -72,27 +70,6 @@ object PodImagePrefs {
         val existing = current.firstOrNull { it.address.equals(address, ignoreCase = true) }
         val updated = (existing ?: EarphonePref(address = address, name = name)).copy(
             name = name.ifBlank { existing?.name.orEmpty() },
-            lastConnectedAt = System.currentTimeMillis(),
-        )
-        val normalized = listOf(updated) + current.filterNot { it.address.equals(address, ignoreCase = true) }
-        service?.getRemotePreferences(ConfigManager.PREFS_NAME)?.let { save(it, normalized) }
-        return save(prefs, normalized)
-    }
-
-    /** Persist the user's chosen built-in colourway for a connected earphone. */
-    fun saveColorVariant(
-        prefs: SharedPreferences,
-        service: XposedService?,
-        address: String,
-        name: String,
-        colorVariant: String?,
-    ): List<EarphonePref> {
-        if (address.isBlank()) return load(prefs)
-        val current = load(prefs)
-        val existing = current.firstOrNull { it.address.equals(address, ignoreCase = true) }
-        val updated = (existing ?: EarphonePref(address = address, name = name)).copy(
-            name = name.ifBlank { existing?.name.orEmpty() },
-            colorVariant = colorVariant,
             lastConnectedAt = System.currentTimeMillis(),
         )
         val normalized = listOf(updated) + current.filterNot { it.address.equals(address, ignoreCase = true) }

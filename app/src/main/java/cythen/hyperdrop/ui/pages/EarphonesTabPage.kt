@@ -56,7 +56,6 @@ internal fun EarphonesTabPage(
     ancModes: List<AncModeOption>,
     boxImagePath: String?,
     deviceImageKey: String?,
-    colorVariantKey: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
     simulatedDevices: List<SimulatedDevice>,
@@ -116,7 +115,6 @@ internal fun EarphonesTabPage(
                 ancModes = ancModes,
                 boxImagePath = boxImagePath,
                 deviceImageKey = deviceImageKey,
-                colorVariantKey = colorVariantKey,
             )
         } else {
             DevicePickerPage(

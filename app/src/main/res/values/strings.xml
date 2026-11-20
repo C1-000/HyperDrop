@@ -69,12 +69,8 @@
     <string name="theme_color">Theme Color</string>
     <string name="theme_color_summary">Choose the app accent color style</string>
     <string name="color_default">Default</string>
-    <string name="color_variant_title">Device colour</string>
     <string name="refresh_status">Refresh status</string>
     <string name="refresh_status_toast">Refreshing device status</string>
-    <string name="color_variant_black">Black</string>
-    <string name="color_variant_white">White</string>
-    <string name="color_variant_purple">Purple</string>
     <string name="color_monet">Dynamic Color</string>
     <string name="floating_bottom_bar">Floating Bottom Bar</string>
     <string name="floating_bottom_bar_summary">Use the KernelSU-style liquid glass floating navigation bar</string>
@@ -167,7 +163,6 @@
     <string name="device_adaptation_summary">Supported models and verification status</string>
     <string name="adaptation_verified">Verified on real hardware</string>
     <string name="adaptation_inferred">Protocol inferred (not verified)</string>
-    <string name="adaptation_fallback_note">Unmatched MOONDROP devices fall back to conservative guessed constants and bundled default artwork.</string>
 
     <string name="pudding_anc_basic">Basic</string>
     <string name="pudding_anc_adaptive">Adaptive</string>

@@ -37,11 +37,8 @@ interface DeviceProfile {
     /** Short provenance / caveat shown in the detail UI ("实机验证" vs "协议推断"). */
     val note: String get() = ""
 
-    /** Stable key used to locate this model's built-in art (dev_{key}_{variant}_*). */
+    /** Stable key used to locate this model's built-in art (asset slug). */
     val imageKey: String get() = id
-
-    /** Built-in colour variants; the UI offers a picker when more than one is present. */
-    val colorVariants: List<ColorVariant> get() = listOf(ColorVariants.DEFAULT)
 
     /** Transport capabilities recorded for this model. Only RFCOMM is implemented today. */
     val transports: List<PodTransport> get() = listOf(PodTransport.RFCOMM_GAIA)

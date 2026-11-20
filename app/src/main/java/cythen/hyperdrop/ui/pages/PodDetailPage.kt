@@ -95,7 +95,6 @@ fun PodDetailPage(
     pending: ControlPendingState? = null,
     boxImagePath: String? = null,
     deviceImageKey: String? = null,
-    colorVariantKey: String? = null,
     showAppSettingsEntry: Boolean = false,
     onOpenAppSettings: () -> Unit = {},
     showSystemSettingsEntry: Boolean = false,
@@ -103,7 +102,7 @@ fun PodDetailPage(
     controlsEnabled: Boolean = true,
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey, colorVariantKey).box
+    val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey).box
     val imagePainter = rememberPodImagePainter(boxImagePath, builtinBoxRes)
 
     // LHDC and dual-device connection are mutually exclusive in firmware. Route

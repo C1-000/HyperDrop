@@ -70,12 +70,8 @@
     <string name="theme_color">主題顏色</string>
     <string name="theme_color_summary">選擇應用強調色樣式</string>
     <string name="color_default">預設</string>
-    <string name="color_variant_title">裝置配色</string>
     <string name="refresh_status">重新整理狀態</string>
     <string name="refresh_status_toast">正在重新整理裝置狀態</string>
-    <string name="color_variant_black">黑色</string>
-    <string name="color_variant_white">白色</string>
-    <string name="color_variant_purple">紫色</string>
     <string name="color_monet">動態取色</string>
     <string name="floating_bottom_bar">懸浮底欄</string>
     <string name="floating_bottom_bar_summary">使用與 KernelSU 同款的液態玻璃懸浮底欄</string>
@@ -167,7 +163,6 @@
     <string name="device_adaptation_summary">已適配機型與驗證狀態</string>
     <string name="adaptation_verified">實機驗證</string>
     <string name="adaptation_inferred">協定推斷（未實機驗證）</string>
-    <string name="adaptation_fallback_note">未配對的水月雨裝置將回退到保守的推測指令與內建預設素材。</string>
 
     <string name="pudding_anc_basic">基礎</string>
     <string name="pudding_anc_adaptive">自適應</string>

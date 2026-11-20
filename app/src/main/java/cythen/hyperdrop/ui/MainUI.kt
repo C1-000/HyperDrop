@@ -748,10 +748,6 @@ fun MainUI(
         earphonePrefs.value = PodImagePrefs.saveImages(context, prefs, xposedService, address, name, images, clearedImages)
     }
 
-    fun saveColorVariant(address: String, name: String, key: String) {
-        earphonePrefs.value = PodImagePrefs.saveColorVariant(prefs, xposedService, address, name, key)
-    }
-
     fun restartScopes(packages: List<String>) {
         if (packages.isEmpty() || restartingScopes) return
         restartingScopes = true
@@ -908,9 +904,6 @@ fun MainUI(
                 onOpenSystemHeadsetSettings = { openSystemHeadsetSettings() },
                 onSavePodImages = { address, name, images, clearedImages ->
                     savePodImages(address, name, images, clearedImages)
-                },
-                onSaveColorVariant = { address, name, key ->
-                    saveColorVariant(address, name, key)
                 },
             )
         }

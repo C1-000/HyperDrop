@@ -12,16 +12,6 @@ import cythen.hyperdrop.pods.NoiseControlMode
 /** How a model talks to the earbuds. Only RFCOMM/GAIA v4 is implemented in this build. */
 enum class PodTransport { BLE_GAIA, RFCOMM_GAIA, BLE_SRC_9ECA }
 
-/** A selectable built-in colourway; the key maps to dev_{imageKey}_{key}_* drawables. */
-data class ColorVariant(val key: String, val labelRes: Int)
-
-object ColorVariants {
-    val DEFAULT = ColorVariant("default", R.string.color_default)
-    val BLACK = ColorVariant("black", R.string.color_variant_black)
-    val WHITE = ColorVariant("white", R.string.color_variant_white)
-    val PURPLE = ColorVariant("purple", R.string.color_variant_purple)
-}
-
 /** Data-driven [DeviceProfile]: every model-specific fact is a constructor argument. */
 data class DeviceProfileSpec(
     override val id: String,
@@ -30,7 +20,6 @@ data class DeviceProfileSpec(
     override val verified: Boolean,
     override val note: String,
     override val imageKey: String,
-    override val colorVariants: List<ColorVariant>,
     override val transports: List<PodTransport>,
     override val capabilities: DeviceCapabilities,
     override val commandTable: GaiaCommandTable,
@@ -109,6 +98,10 @@ object DeviceModels {
     private val gainReversed = intArrayOf(2, 1, 0)
     private val gainLabels = listOf("Low", "Medium", "High")
 
+    /** Most conservative capability set for a model with no real-hardware evidence. */
+    private val conservativeCaps: DeviceCapabilities
+        get() = inferredCaps(ac4Pairs, gain = null)
+
     private fun inferredCaps(
         pairs: List<Pair<NoiseControlMode, Int>>,
         path: AncPathKind = AncPathKind.AUDIO_CURATION,
@@ -155,9 +148,8 @@ object DeviceModels {
         id: String,
         displayName: String,
         aliases: List<String>,
-        caps: DeviceCapabilities,
+        caps: DeviceCapabilities = conservativeCaps,
         imageKey: String = id,
-        colorVariants: List<ColorVariant> = listOf(ColorVariants.DEFAULT),
     ) = DeviceProfileSpec(
         id = id,
         displayName = displayName,
@@ -165,7 +157,6 @@ object DeviceModels {
         verified = false,
         note = "Protocol inferred — not verified on real hardware",
         imageKey = imageKey,
-        colorVariants = colorVariants,
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilities = caps,
         commandTable = genericTable(caps),
@@ -179,13 +170,7 @@ object DeviceModels {
         aliases = listOf("pudding", "mdtws056"),
         verified = true,
         note = "Verified on real hardware (PuddingPods)",
-        imageKey = "pudding",
-        colorVariants = listOf(
-            ColorVariants.DEFAULT,
-            ColorVariants.BLACK,
-            ColorVariants.WHITE,
-            ColorVariants.PURPLE,
-        ),
+        imageKey = "moondrop_pudding",
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilities = DeviceCapabilities(
             adaptiveSupported = true,
@@ -204,8 +189,6 @@ object DeviceModels {
             gainMap = gainReversed,
             gainLabels = gainLabels,
             ledSupported = true,
-            // Per MiuixMoondrop's ADAPTATION.md feature matrix, PUDDING supports
-            // prompt tone (on/off + volume), LHDC and dual-device connection.
             promptToneSupported = true,
             promptVolumeSupported = true,
             lhdcSupported = true,
@@ -221,48 +204,63 @@ object DeviceModels {
         aliases = listOf("mirage", "海市蜃楼"),
         verified = true,
         note = "Verified on real hardware (PUDDING-linked variant)",
-        imageKey = "mirage",
-        colorVariants = listOf(ColorVariants.DEFAULT),
+        imageKey = "moondrop_mirage",
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilities = pudding.capabilities,
         commandTable = PuddingCommandTable,
     )
 
-    // ---- Protocol-inferred models --------------------------------------------------
+    // ---- Protocol-inferred models (45 total: 2 verified + 43 inferred) ------------
+    // The first 15 keep their historical ids/aliases/capabilities for matching
+    // compatibility; imageKey is the asset slug. The remaining 28 are newly added
+    // models with conservative capabilities and name-based aliases.
 
     val models: List<DeviceProfile> = listOf(
         pudding,
         mirage,
-        inferred("edge", "MOONDROP EDGE", listOf("edge"),
-            inferredCaps(ac3Pairs, gain = gainIdentity, singleDeviceBattery = true)),
-        inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"),
-            inferredCaps(ac3Pairs, gain = gainIdentity)),
-        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"),
-            inferredCaps(ac4Pairs, gain = gainReversed, promptTone = true)),
-        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"),
-            inferredCaps(ac4Pairs, gain = gainReversed, spatial = true)),
-        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"),
-            inferredCaps(ac4Pairs, gain = gainReversed, spatial = true)),
-        inferred("space_travel", "MOONDROP Space Travel", listOf("spacetravel"),
-            inferredCaps(ac4Pairs)),
-        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"),
-            inferredCaps(ac4Pairs, gain = gainReversed)),
-        inferred("maca", "MOONDROP MACA", listOf("maca"),
-            inferredCaps(ac4Pairs, lhdc = true, spatial = true)),
-        inferred("nekocake", "MOONDROP NEKOCAKE", listOf("nekocake", "neko"),
-            inferredCaps(ac4Pairs, lhdc = true)),
-        inferred("pills", "MOONDROP PILLS", listOf("pills"),
-            inferredCaps(ac4Pairs)),
-        inferred("sparks", "MOONDROP SPARKS", listOf("sparks"),
-            inferredCaps(ac4Pairs)),
-        inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"),
-            inferredCaps(ac4Pairs)),
-        inferred("robins", "MOONDROP robins", listOf("robins", "robin"),
-            inferredCaps(ac4Pairs)),
-        inferred("alice", "MOONDROP Alice", listOf("alice"),
-            inferredCaps(ac4Pairs)),
-        inferred("block", "MOONDROP BLOCK", listOf("block"),
-            DeviceCapabilities.NONE),
+        inferred("bianca_stigmata", "BIANCA:STIGMATA", listOf("biancastigmata", "bianca", "stigmata"), conservativeCaps, "bianca_stigmata"),
+        inferred("h_i_d_e_404_klukai", "H.I.D.E.404_Klukai", listOf("404klukai", "klukai"), conservativeCaps, "h_i_d_e_404_klukai"),
+        inferred("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), conservativeCaps, "laplace_oba"),
+        inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), conservativeCaps, "me_163_komet_moca"),
+        inferred("alice", "MOONDROP Alice", listOf("alice"), inferredCaps(ac4Pairs), "moondrop_alice"),
+        inferred("moondrop_dots", "MOONDROP Dots", listOf("MOONDROP Dots"), conservativeCaps, "moondrop_dots"),
+        inferred("edge", "MOONDROP EDGE", listOf("edge"), inferredCaps(ac3Pairs, gain = gainIdentity, singleDeviceBattery = true), "moondrop_edge"),
+        inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), inferredCaps(ac3Pairs, gain = gainIdentity), "moondrop_edge_2"),
+        inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), conservativeCaps, "moondrop_evo_2"),
+        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), inferredCaps(ac4Pairs, gain = gainReversed), "moondrop_golden_ages"),
+        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), inferredCaps(ac4Pairs, gain = gainReversed, promptTone = true), "moondrop_golden_ages_2"),
+        inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), conservativeCaps, "moondrop_littlewhite"),
+        inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), conservativeCaps, "moondrop_mm3a"),
+        inferred("maca", "MOONDROP MACA", listOf("maca"), inferredCaps(ac4Pairs, lhdc = true, spatial = true), "moondrop_moca"),
+        inferred("moondrop_moon_travel", "MOONDROP MOON TRAVEL", listOf("moontravel", "travel"), conservativeCaps, "moondrop_moon_travel"),
+        inferred("nekocake", "MOONDROP NEKOCAKE", listOf("nekocake", "neko"), inferredCaps(ac4Pairs, lhdc = true), "moondrop_nekocake"),
+        inferred("moondrop_nekocake_acht_acht_limited", "Moondrop Nekocake Acht Acht Limited", listOf("nekocakeachtacht", "nekocake"), conservativeCaps, "moondrop_nekocake_acht_acht_limited"),
+        inferred("moondrop_nekocake_qbz_191", "Moondrop Nekocake QBZ-191", listOf("nekocakeqbz191", "nekocake"), conservativeCaps, "moondrop_nekocake_qbz_191"),
+        inferred("pills", "MOONDROP PILLS", listOf("pills"), inferredCaps(ac4Pairs), "moondrop_pill"),
+        inferred("moondrop_punishing_gray_raven", "Moondrop PUNISHING;GRAY RAVEN IOS", listOf("punishinggrayraven", "punishing", "raven"), conservativeCaps, "moondrop_punishing_gray_raven"),
+        inferred("space_travel", "MOONDROP Space Travel", listOf("spacetravel"), inferredCaps(ac4Pairs), "moondrop_space_travel"),
+        inferred("sparks", "MOONDROP SPARKS", listOf("sparks"), inferredCaps(ac4Pairs), "moondrop_sparks"),
+        inferred("moondrop_sparxie", "MOONDROP Sparxie", listOf("sparxie"), conservativeCaps, "moondrop_sparxie"),
+        inferred("moondrop_susanoo_tws", "Moondrop SUSANOO TWS IOS", listOf("susanoo"), conservativeCaps, "moondrop_susanoo_tws"),
+        inferred("moondrop_the_garden", "MOONDROP The Garden", listOf("garden"), conservativeCaps, "moondrop_the_garden"),
+        inferred("moondrop_u_c_t_s", "Moondrop U.C.T.S.", listOf("Moondrop U.C.T.S."), conservativeCaps, "moondrop_u_c_t_s"),
+        inferred("moondrop_ultrasonic", "MOONDROP Ultrasonic", listOf("ultrasonic"), conservativeCaps, "moondrop_ultrasonic"),
+        inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"), inferredCaps(ac4Pairs), "moondrop_voyager"),
+        inferred("moondrop_x_yasuno_kiyono", "MOONDROP x YASUNO KIYONO", listOf("yasunokiyono", "yasuno", "kiyono"), conservativeCaps, "moondrop_x_yasuno_kiyono"),
+        inferred("nicole_reeyn", "Nicole Reeyn", listOf("nicolereeyn", "nicole", "reeyn"), conservativeCaps, "nicole_reeyn"),
+        inferred("pandaer_open_air_pill", "PANDAER Open Air Pill", listOf("openairpill"), conservativeCaps, "pandaer_open_air_pill"),
+        inferred("pandaer_space_travel_2", "PANDAER Space Travel 2", listOf("spacetravel", "space", "travel"), conservativeCaps, "pandaer_space_travel_2"),
+        inferred("pill_gotoh_hitori", "Pill Gotoh Hitori", listOf("pillgotohhitori", "gotoh", "hitori"), conservativeCaps, "pill_gotoh_hitori"),
+        inferred("pill_ijichi_nijika", "Pill Ijichi Nijika", listOf("pillijichinijika", "ijichi", "nijika"), conservativeCaps, "pill_ijichi_nijika"),
+        inferred("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "ikuyo"), conservativeCaps, "pill_kita_ikuyo"),
+        inferred("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada"), conservativeCaps, "pill_yamada_ryo"),
+        inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), conservativeCaps, "punishing_gray_raven"),
+        inferred("robins", "MOONDROP robins", listOf("robins", "robin"), inferredCaps(ac4Pairs), "robin_s_earphones"),
+        inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), conservativeCaps, "space_force"),
+        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), inferredCaps(ac4Pairs, gain = gainReversed, spatial = true), "space_travel_2"),
+        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), inferredCaps(ac4Pairs, gain = gainReversed, spatial = true), "space_travel_2_ultra"),
+        inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), conservativeCaps, "susanoo_tws"),
+        inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), conservativeCaps, "zzz_angels_ows"),
     )
 
     val byAlias: List<Pair<String, DeviceProfile>> = models
@@ -277,7 +275,6 @@ object DeviceModels {
         verified = false,
         note = "Unrecognised MOONDROP model — commands use conservative guessed constants",
         imageKey = "default",
-        colorVariants = listOf(ColorVariants.DEFAULT),
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilities = inferredCaps(ac4Pairs, gain = null),
         commandTable = NoOpGaiaCommandTable,

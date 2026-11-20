@@ -38,7 +38,7 @@ object PodImageLoader {
     }
 
     /**
-     * Pick the built-in drawable for a device+colourway. Custom images (handled above)
+     * Pick the built-in drawable for a device. Custom images (handled above)
      * always win; this only resolves the bundled fallback art.
      */
     private fun resolveFallbackRes(
@@ -50,7 +50,7 @@ object PodImageLoader {
         val earphone = runCatching { PodImagePrefs.findOrLatest(prefs, address) }.getOrNull()
         if (earphone == null) return genericResId
         val profile = DeviceModels.match(earphone.name) ?: return genericResId
-        val art: DeviceImageSet = DeviceImageCatalog.resolve(profile.imageKey, earphone.colorVariant)
+        val art: DeviceImageSet = DeviceImageCatalog.resolve(profile.imageKey)
         return when (resource) {
             PodImageResource.BOX -> art.box
             PodImageResource.LEFT -> art.left

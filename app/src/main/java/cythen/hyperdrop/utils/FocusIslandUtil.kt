@@ -69,9 +69,8 @@ object FocusIslandUtil {
             }
 
             val earphone = runCatching { PodImagePrefs.findOrLatest(prefs, address) }.getOrNull()
-            val variantKey = earphone?.colorVariant
             val profile = earphone?.name?.let { DeviceModels.match(it) }
-            val art = profile?.let { DeviceImageCatalog.resolve(it.imageKey, variantKey) }
+            val art = profile?.let { DeviceImageCatalog.resolve(it.imageKey) }
                 ?: DeviceImageCatalog.DEFAULT
             val leftBitmap = BitmapFactory.decodeResource(moduleContext.resources, art.left)
             val rightBitmap = BitmapFactory.decodeResource(moduleContext.resources, art.right)

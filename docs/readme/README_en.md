@@ -15,15 +15,21 @@
 
 </div>
 
-An Xposed module that provides system-level control for **MOONDROP earphones** on Xiaomi HyperOS devices. PUDDING / MD-TWS-056 is the first supported model, with more models planned.
+An Xposed module that provides system-level control for **MOONDROP earphones** on Xiaomi HyperOS devices. It bundles **45 models** with adaptation profiles and artwork; **PUDDING / MD-TWS-056 and MIRAGE are verified on real hardware**, while the rest are adapted by protocol inference.
 
 ### Earphone Features
 
+> The controls shown depend on the current model's adapted capabilities; unverified models only show their conservative supported subset.
+
 - **Noise Cancellation Control** — Supports Off / Transparency / Basic ANC / Adaptive ANC / Wind Noise Reduction.
-- **Three-part Battery Display** — Reads the real PUDDING GAIA battery levels for the left earbud, right earbud, and charging case.
-- **Earbud-side Mode Sync** — When ANC is changed by a long-press on the earbuds, the module syncs it from an active report or the ~3 s status poll and refreshes all three battery values at the same time.
+- **Three-part Battery Display** — Reads the real GAIA battery levels for the left earbud, right earbud, and charging case.
+- **Earbud-side Mode Sync** — When ANC is changed by a long-press on the earbuds, the module syncs it from an active report or the status poll and refreshes all three battery values at the same time.
 - **Gain Control** — Supports Low / Medium / High output gain.
 - **Indicator Light Control** — Turns the earphone indicator light on or off.
+- **Prompt Tone** — Prompt tone on/off and volume (volume is reported on release; percentage shown on the right).
+- **LHDC** — LHDC codec toggle (switching may briefly disconnect and auto-reconnect).
+- **Dual-device Connection** — Dual-device toggle; mutually exclusive with LHDC, with a confirmation dialog when switching.
+- **Status Refresh** — A refresh button at the top-right of the control page queries the device immediately and echoes the real state.
 
 ### HyperOS Integration
 
@@ -35,14 +41,16 @@ An Xposed module that provides system-level control for **MOONDROP earphones** o
 ### Module Features
 
 - **Quick Popup** — Tap the Hyper Island or an earphone entry to view battery, ANC, and quick controls.
-- **Dedicated Detail Page** — Provides the PUDDING product image, battery, ANC, gain, indicator light, and app settings.
+- **Dedicated Detail Page** — Provides product artwork, battery, ANC, gain, indicator light, prompt tone, LHDC, dual-device, head tracking, and app settings for adapted models.
+- **Bundled Model Artwork** — Box / left / right images for all 45 models are bundled in the APK; unmatched models fall back to default artwork. Custom images (uploaded in settings) still override the built-in ones.
+- **Adaptation Status Page** — Settings page listing all adapted models, grouped into "Verified on hardware" and "Protocol inferred".
 - **Languages** — Supports Traditional Chinese, Simplified Chinese, English, and Follow System; Follow System is the default on first install, falling back to English for unsupported locales.
 
 ### Device Support and Protocol
 
-HyperDrop communicates directly with the earphones over Classic Bluetooth RFCOMM / SPP and controls supported MOONDROP models through Qualcomm GAIA v4. The MOONDROP official app does not need to stay running.
+HyperDrop communicates directly with the earphones over Classic Bluetooth RFCOMM / SPP and controls supported MOONDROP models through Qualcomm GAIA v4. The MOONDROP official app does not need to stay running. Adapted models are listed in the in-app "Device adaptation" page; protocol details, commands, battery parsing, and HyperOS mapping are in [PUDDING_ADAPTATION.md](../../PUDDING_ADAPTATION.md).
 
-For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDING_ADAPTATION.md](../../PUDDING_ADAPTATION.md).
+PUDDING / MD-TWS-056 and MIRAGE are verified on real hardware; other models are protocol-inferred from MiuixMoondrop's adaptation data and have not been confirmed on real devices.
 
 ### System Requirements
 
@@ -54,7 +62,7 @@ For protocol details, commands, battery parsing, and HyperOS mapping, see [PUDDI
 1. Install the APK.
 2. Enable the module in LSPosed and select the recommended scopes.
 3. Restart the required scopes or reboot the device.
-4. Connect a supported MOONDROP earphone (currently PUDDING / MD-TWS-056) via Bluetooth.
+4. Connect a supported MOONDROP earphone via Bluetooth (45 bundled models; PUDDING / MD-TWS-056 and MIRAGE verified on hardware).
 
 ### Coexisting with the Official App (Optional)
 
@@ -73,6 +81,7 @@ While enabled, once the official app process is alive and the earphones are conn
 - [HyperOriG](https://github.com/KiriChen-Wind/HyperOriG) — reference for multi-process HyperOS integration, Focus Island, and Device Center routing.
 - [PuddingPods](https://github.com/lingbai-rong/PuddingPods) — foundation of this project.
 - [Miuix](https://github.com/YuKongA/miuix) — HyperOS-style Compose UI components.
+- [MiuixMoondrop](https://github.com/huime180/MiuixMoondrop) — reference for multi-device adaptation data, capability definitions, and mutual-exclusion logic.
 
 ### License
 

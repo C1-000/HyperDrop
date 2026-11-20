@@ -56,15 +56,6 @@ fun AdaptationStatusPage(
         items(inferred.size) { index ->
             DeviceAdaptationCard(inferred[index])
         }
-
-        item {
-            Card(modifier = Modifier.padding(top = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.adaptation_fallback_note),
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
-        }
     }
 }
 
@@ -73,7 +64,6 @@ private fun DeviceAdaptationCard(profile: DeviceProfile) {
     Card(modifier = Modifier.padding(vertical = 4.dp)) {
         BasicComponent(
             title = profile.displayName,
-            summary = profile.note.ifBlank { profile.id },
             onClick = {},
         )
     }

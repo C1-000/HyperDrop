@@ -1,6 +1,7 @@
 package cythen.hyperdrop.device
 
 import cythen.hyperdrop.config.ConfigManager
+import cythen.hyperdrop.config.DeviceImageCatalog
 import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.PuddingProfile
@@ -129,5 +130,41 @@ class DeviceCapabilitiesTest {
         assertEquals(0, pudding.ancSetMap[1])  // UI status 1 = OFF -> wire 0
         assertEquals(4, pudding.ancSetMap[4])  // ADAPTIVE -> wire 4
         assertEquals(3, pudding.ancSetMap[5])  // WIND_REDUCTION -> wire 3
+    }
+
+    @Test
+    fun `model catalogue has 45 unique image keys with only two verified`() {
+        assertEquals(45, DeviceModels.models.size)
+        assertEquals(2, DeviceModels.models.count { it.verified })
+        val keys = DeviceModels.models.map { it.imageKey }
+        assertEquals("imageKey must be unique", keys.size, keys.toSet().size)
+        // Every imageKey except the deliberate fallback resolves to a bundled set.
+        DeviceModels.models.forEach { model ->
+            val set = DeviceImageCatalog.resolve(model.imageKey)
+            assertTrue("Unresolved art for ${model.imageKey}", set.box != 0)
+            assertTrue("Unresolved art for ${model.imageKey}", set.left != 0)
+            assertTrue("Unresolved art for ${model.imageKey}", set.right != 0)
+        }
+    }
+
+    @Test
+    fun `one-piece models fall back to box art for left and right`() {
+        val onePiece = listOf(
+            "bianca_stigmata", "moondrop_edge", "moondrop_edge_2",
+            "moondrop_littlewhite", "moondrop_voyager", "nicole_reeyn",
+        )
+        onePiece.forEach { key ->
+            val set = DeviceImageCatalog.resolve(key)
+            assertEquals(key, set.box, set.left)
+            assertEquals(key, set.box, set.right)
+        }
+    }
+
+    @Test
+    fun `unknown image key falls back to default art`() {
+        assertEquals(
+            DeviceImageCatalog.DEFAULT,
+            DeviceImageCatalog.resolve("definitely_not_a_model"),
+        )
     }
 }

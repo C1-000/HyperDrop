@@ -70,12 +70,8 @@
     <string name="theme_color">主题颜色</string>
     <string name="theme_color_summary">选择应用强调色样式</string>
     <string name="color_default">默认</string>
-    <string name="color_variant_title">设备配色</string>
     <string name="refresh_status">刷新状态</string>
     <string name="refresh_status_toast">正在刷新设备状态</string>
-    <string name="color_variant_black">黑色</string>
-    <string name="color_variant_white">白色</string>
-    <string name="color_variant_purple">紫色</string>
     <string name="color_monet">动态取色</string>
     <string name="floating_bottom_bar">悬浮底栏</string>
     <string name="floating_bottom_bar_summary">使用与 KernelSU 同款的液态玻璃悬浮底栏</string>
@@ -168,7 +164,6 @@
     <string name="device_adaptation_summary">已适配机型与验证状态</string>
     <string name="adaptation_verified">实机验证</string>
     <string name="adaptation_inferred">协议推断（未实机验证）</string>
-    <string name="adaptation_fallback_note">未匹配的水月雨设备将回退到保守的推测命令与内置默认素材。</string>
 
     <string name="pudding_anc_basic">基础</string>
     <string name="pudding_anc_adaptive">自适应</string>
