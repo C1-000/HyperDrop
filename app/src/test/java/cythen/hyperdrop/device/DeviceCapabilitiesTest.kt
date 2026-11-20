@@ -92,6 +92,34 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
+    fun `pudding exposes all MiuixMoondrop-documented capabilities`() {
+        val caps = DeviceRegistry.detectDeviceCapabilities("MOONDROP PUDDING")
+        assertTrue(caps.gainSupported)
+        assertTrue(caps.ledSupported)
+        assertTrue(caps.promptToneSupported)
+        assertTrue(caps.promptVolumeSupported)
+        assertTrue(caps.lhdcSupported)
+        assertTrue(caps.dualConnectionSupported)
+        // Head tracking / spatial audio are not real-hardware verified for PUDDING.
+        assertFalse(caps.headTrackingSupported)
+        assertFalse(caps.spatialAudioSupported)
+    }
+
+    @Test
+    fun `pudding command table handles extended VOICE LHDC and dual commands`() {
+        val table = DeviceModels.pudding.commandTable
+        assertEquals("00 1D 1C 01", table.queryVoiceConfig!!.joinToString(" ") { "%02X".format(it) })
+        assertEquals("00 1D 20 05", table.queryLhdc!!.joinToString(" ") { "%02X".format(it) })
+        assertEquals("00 1D 28 01", table.queryDualConnection!!.joinToString(" ") { "%02X".format(it) })
+        assertEquals("00 1D 1C 02 01 32 00", table.setPromptTone(true, 50, 0)!!.joinToString(" ") { "%02X".format(it) })
+        assertEquals("00 1D 20 06 01", table.setLhdc(true)!!.joinToString(" ") { "%02X".format(it) })
+        assertEquals("00 1D 28 02 01", table.setDualConnection(true)!!.joinToString(" ") { "%02X".format(it) })
+        assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x1D, 0x01, 1, 50, 0)) is cythen.hyperdrop.device.protocol.GaiaReport.VoiceConfig)
+        assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x05, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.Lhdc)
+        assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x29, 0x01, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.DualConnection)
+    }
+
+    @Test
     fun `inferred model caps carry ANC path and gain mapping`() {
         val edge = DeviceRegistry.profileById("edge")
         assertTrue(edge.capabilities.gainSupported)

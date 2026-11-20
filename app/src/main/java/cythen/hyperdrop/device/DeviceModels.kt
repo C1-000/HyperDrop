@@ -204,6 +204,12 @@ object DeviceModels {
             gainMap = gainReversed,
             gainLabels = gainLabels,
             ledSupported = true,
+            // Per MiuixMoondrop's ADAPTATION.md feature matrix, PUDDING supports
+            // prompt tone (on/off + volume), LHDC and dual-device connection.
+            promptToneSupported = true,
+            promptVolumeSupported = true,
+            lhdcSupported = true,
+            dualConnectionSupported = true,
         ),
         commandTable = PuddingCommandTable,
     )

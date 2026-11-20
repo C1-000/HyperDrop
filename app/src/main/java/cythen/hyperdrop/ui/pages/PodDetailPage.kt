@@ -286,8 +286,9 @@ private fun LazyListScope.podControlItems(
     controlsEnabled: Boolean,
     bottomContentPadding: Dp
 ) {
-    fun busy(flag: androidx.compose.runtime.MutableState<Boolean>?): Boolean =
-        !controlsEnabled || (flag?.value == true)
+    // A control is enabled when the session allows control AND it is not mid-operation.
+    fun controlEnabled(flag: androidx.compose.runtime.MutableState<Boolean>?): Boolean =
+        controlsEnabled && (flag?.value != true)
     val spatialAudioValues = listOf(
         ConfigManager.SPATIAL_AUDIO_OFF,
         ConfigManager.SPATIAL_AUDIO_FIXED,
@@ -340,7 +341,7 @@ private fun LazyListScope.podControlItems(
                     items = gainOptions,
                     selectedIndex = gainLevel.coerceIn(0, gainOptions.size - 1),
                     onSelectedIndexChange = { onGainLevelChange(it.coerceIn(0, gainOptions.size - 1)) },
-                    enabled = busy(pending?.gain)
+                    enabled = controlEnabled(pending?.gain)
                 )
             }
         }
@@ -355,7 +356,7 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.pudding_led_summary),
                     checked = ledEnabled,
                     onCheckedChange = onLedEnabledChange,
-                    enabled = busy(pending?.led)
+                    enabled = controlEnabled(pending?.led)
                 )
             }
         }
@@ -370,7 +371,7 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.control_prompt_tone_summary),
                     checked = promptToneEnabled,
                     onCheckedChange = onPromptToneChange,
-                    enabled = busy(pending?.promptTone)
+                    enabled = controlEnabled(pending?.promptTone)
                 )
             }
         }
@@ -386,7 +387,7 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_prompt_volume_title),
                     summary = stringResource(R.string.control_prompt_volume_summary),
                     valueRange = 0f..100f,
-                    enabled = busy(pending?.promptTone),
+                    enabled = controlEnabled(pending?.promptTone),
                 )
             }
         }
@@ -401,7 +402,7 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.control_head_tracking_summary),
                     checked = headTrackingEnabled,
                     onCheckedChange = onHeadTrackingChange,
-                    enabled = busy(pending?.headTracking)
+                    enabled = controlEnabled(pending?.headTracking)
                 )
             }
         }
@@ -416,7 +417,7 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.control_lhdc_summary),
                     checked = lhdcEnabled,
                     onCheckedChange = onLhdcChange,
-                    enabled = busy(pending?.lhdc)
+                    enabled = controlEnabled(pending?.lhdc)
                 )
             }
         }
@@ -431,7 +432,7 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.control_dual_connection_summary),
                     checked = dualConnectionEnabled,
                     onCheckedChange = onDualConnectionChange,
-                    enabled = busy(pending?.dualConnection)
+                    enabled = controlEnabled(pending?.dualConnection)
                 )
             }
         }

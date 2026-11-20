@@ -32,6 +32,12 @@ object PuddingCommandTable : GaiaCommandTable {
         0x00, 0x1D, 0x1A, 0x01, 0x01, 0x02
     )
 
+    // Extended features PUDDING supports per MiuixMoondrop's ADAPTATION.md matrix.
+    // VOICE (0x0E), CODEC_TYPE/LHDC (0x10) and ONEBRINGTWO (0x14).
+    override val queryVoiceConfig: ByteArray = byteArrayOf(0x00, 0x1D, 0x1C, 0x01)
+    override val queryLhdc: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x05)
+    override val queryDualConnection: ByteArray = byteArrayOf(0x00, 0x1D, 0x28, 0x01)
+
     override val ancCycle: List<Int> = listOf(2, 4, 5, 3, 1)
 
     /**
@@ -79,6 +85,20 @@ object PuddingCommandTable : GaiaCommandTable {
     override fun setLedEnabled(enabled: Boolean): ByteArray = byteArrayOf(
         0x00, 0x1D, 0x26, 0x02, if (enabled) 0x01 else 0x00
     )
+
+    override fun setPromptTone(enabled: Boolean, volume: Int, index: Int): ByteArray =
+        byteArrayOf(
+            0x00, 0x1D, 0x1C, 0x02,
+            if (enabled) 0x01 else 0x00,
+            volume.coerceIn(0, 100).toByte(),
+            (index and 0xFF).toByte(),
+        )
+
+    override fun setLhdc(enabled: Boolean): ByteArray =
+        byteArrayOf(0x00, 0x1D, 0x20, 0x06, if (enabled) 0x01 else 0x00)
+
+    override fun setDualConnection(enabled: Boolean): ByteArray =
+        byteArrayOf(0x00, 0x1D, 0x28, 0x02, if (enabled) 0x01 else 0x00)
 
     override fun gainUiToWire(uiValue: Int): Int? = GainLevel.fromUi(uiValue)?.wireValue
     override fun gainWireToUi(wire: Int): Int? = GainLevel.fromWire(wire)?.uiValue
@@ -128,6 +148,27 @@ object PuddingCommandTable : GaiaCommandTable {
         if (matchesAny(payload, 0x27, 0x01, 0x02)) {
             val value = payload[4].toInt() and 0xFF
             if (value == 0 || value == 1) return GaiaReport.LedEnabled(value == 1)
+        }
+
+        // VOICE: 00 1D 1D 01/02 <enabled, volume, index>.
+        if (matchesAny(payload, 0x1D, 0x01, 0x02) && payload.size >= 7) {
+            return GaiaReport.VoiceConfig(
+                enabled = payload[4].toInt() and 0xFF == 1,
+                volume = payload[5].toInt() and 0xFF,
+                index = payload[6].toInt() and 0xFF,
+            )
+        }
+
+        // CODEC_TYPE / LHDC: 00 1D 21 05/06 <0|1>.
+        if (matchesAny(payload, 0x21, 0x05, 0x06)) {
+            val value = payload[4].toInt() and 0xFF
+            if (value == 0 || value == 1) return GaiaReport.Lhdc(value == 1)
+        }
+
+        // ONEBRINGTWO / dual connection: 00 1D 29 01/02 <0|1>.
+        if (matchesAny(payload, 0x29, 0x01, 0x02)) {
+            val value = payload[4].toInt() and 0xFF
+            if (value == 0 || value == 1) return GaiaReport.DualConnection(value == 1)
         }
 
         // The first v1 response is the GAIA API-version response (feature 0x0A).
