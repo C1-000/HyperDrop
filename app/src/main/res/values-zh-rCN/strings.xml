@@ -71,6 +71,8 @@
     <string name="theme_color_summary">选择应用强调色样式</string>
     <string name="color_default">默认</string>
     <string name="color_variant_title">设备配色</string>
+    <string name="refresh_status">刷新状态</string>
+    <string name="refresh_status_toast">正在刷新设备状态</string>
     <string name="color_variant_black">黑色</string>
     <string name="color_variant_white">白色</string>
     <string name="color_variant_purple">紫色</string>

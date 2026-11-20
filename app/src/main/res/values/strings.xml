@@ -70,6 +70,8 @@
     <string name="theme_color_summary">Choose the app accent color style</string>
     <string name="color_default">Default</string>
     <string name="color_variant_title">Device colour</string>
+    <string name="refresh_status">Refresh status</string>
+    <string name="refresh_status_toast">Refreshing device status</string>
     <string name="color_variant_black">Black</string>
     <string name="color_variant_white">White</string>
     <string name="color_variant_purple">Purple</string>

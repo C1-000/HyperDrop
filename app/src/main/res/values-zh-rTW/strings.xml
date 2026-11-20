@@ -71,6 +71,8 @@
     <string name="theme_color_summary">選擇應用強調色樣式</string>
     <string name="color_default">預設</string>
     <string name="color_variant_title">裝置配色</string>
+    <string name="refresh_status">重新整理狀態</string>
+    <string name="refresh_status_toast">正在重新整理裝置狀態</string>
     <string name="color_variant_black">黑色</string>
     <string name="color_variant_white">白色</string>
     <string name="color_variant_purple">紫色</string>

@@ -104,6 +104,16 @@ fun MainUI(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val pending = remember { ControlPendingState() }
+
+    /** Mark a control busy for up to 5s, or until an echo broadcast clears it. */
+    fun markPending(flag: androidx.compose.runtime.MutableState<Boolean>) {
+        flag.value = true
+        coroutineScope.launch {
+            delay(5_000L)
+            flag.value = false
+        }
+    }
 
     val mainTitle = remember { mutableStateOf("") }
     val batteryParams = remember { mutableStateOf(BatteryParams()) }
@@ -259,11 +269,13 @@ fun MainUI(
                     OppoPodsAction.ACTION_PODS_ANC_CHANGED -> {
                         connectedDeviceAddress = p1.getStringExtra("address") ?: connectedDeviceAddress
                         ancMode.value = ancModeFromUiStatus(p1.getIntExtra("status", 1))
+                        pending.anc.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_SMART_ANC_LEVEL_CHANGED -> {
                         val ord = p1.getIntExtra("ordinal", -1)
                         smartAncLevel.value = NoiseControlMode.entries.getOrNull(ord)
+                        pending.smartAncLevel.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_BATTERY_CHANGED -> {
@@ -283,22 +295,48 @@ fun MainUI(
 
                     OppoPodsAction.ACTION_PODS_TRANSPARENCY_VOCAL_ENHANCEMENT_CHANGED -> {
                         transparencyVocalEnhancement.value = p1.getBooleanExtra("enabled", false)
+                        pending.transparency.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_SPATIAL_AUDIO_CHANGED -> {
                         spatialAudioMode.value = p1.getIntExtra("mode", ConfigManager.SPATIAL_AUDIO_OFF)
+                        pending.spatial.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_EQ_PRESET_CHANGED -> {
                         eqPreset.value = p1.getIntExtra("preset", -1)
+                        pending.eq.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED -> {
                         gainLevel.value = p1.getIntExtra("level", gainLevel.value).coerceIn(0, 2)
+                        pending.gain.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED -> {
                         ledEnabled.value = p1.getBooleanExtra("enabled", ledEnabled.value)
+                        pending.led.value = false
+                    }
+
+                    OppoPodsAction.ACTION_PROMPT_TONE_CHANGED -> {
+                        promptToneEnabled.value = p1.getBooleanExtra("enabled", promptToneEnabled.value)
+                        promptVolume.value = p1.getIntExtra("volume", promptVolume.value).coerceIn(0, 100)
+                        pending.promptTone.value = false
+                    }
+
+                    OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED -> {
+                        headTrackingEnabled.value = p1.getBooleanExtra("enabled", headTrackingEnabled.value)
+                        pending.headTracking.value = false
+                    }
+
+                    OppoPodsAction.ACTION_LHDC_CHANGED -> {
+                        lhdcEnabled.value = p1.getBooleanExtra("enabled", lhdcEnabled.value)
+                        pending.lhdc.value = false
+                    }
+
+                    OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED -> {
+                        dualConnectionEnabled.value = p1.getBooleanExtra("enabled", dualConnectionEnabled.value)
+                        pending.dualConnection.value = false
                     }
 
                     OppoPodsAction.ACTION_PODS_CONNECTED -> {
@@ -377,6 +415,10 @@ fun MainUI(
             addAction(OppoPodsAction.ACTION_PODS_EQ_PRESET_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED)
+            addAction(OppoPodsAction.ACTION_PROMPT_TONE_CHANGED)
+            addAction(OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED)
+            addAction(OppoPodsAction.ACTION_LHDC_CHANGED)
+            addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTION_STATE_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_DISCONNECTED)
@@ -412,6 +454,7 @@ fun MainUI(
 
     fun setAncMode(mode: NoiseControlMode) {
         ancMode.value = mode
+        markPending(pending.anc)
         val status = mode.toUiStatus()
         Intent(OppoPodsAction.ACTION_ANC_SELECT).apply {
             this.putExtra("status", status)
@@ -423,6 +466,7 @@ fun MainUI(
 
     fun setTransparencyVocalEnhancement(enabled: Boolean) {
         transparencyVocalEnhancement.value = enabled
+        markPending(pending.transparency)
         Intent(OppoPodsAction.ACTION_TRANSPARENCY_VOCAL_ENHANCEMENT_SET).apply {
             this.putExtra("enabled", enabled)
             setPackage("com.android.bluetooth")
@@ -464,6 +508,7 @@ fun MainUI(
     fun setSpatialAudioMode(mode: Int) {
         val normalizedMode = mode.coerceIn(ConfigManager.SPATIAL_AUDIO_OFF, ConfigManager.SPATIAL_AUDIO_HEAD_TRACKING)
         spatialAudioMode.value = normalizedMode
+        markPending(pending.spatial)
         prefs.edit().putInt("spatial_audio_mode", normalizedMode).apply()
         Intent(OppoPodsAction.ACTION_SPATIAL_AUDIO_SET).apply {
             this.putExtra("mode", normalizedMode)
@@ -475,6 +520,7 @@ fun MainUI(
 
     fun setEqPreset(preset: Int) {
         eqPreset.value = preset
+        markPending(pending.eq)
         Intent(OppoPodsAction.ACTION_EQ_PRESET_SET).apply {
             this.putExtra("preset", preset)
             setPackage("com.android.bluetooth")
@@ -486,6 +532,7 @@ fun MainUI(
     fun setGainLevel(level: Int) {
         val normalized = level.coerceIn(0, 2)
         gainLevel.value = normalized
+        markPending(pending.gain)
         Intent(OppoPodsAction.ACTION_GAIN_LEVEL_SET).apply {
             putExtra("level", normalized)
             setPackage("com.android.bluetooth")
@@ -496,6 +543,7 @@ fun MainUI(
 
     fun setLedEnabled(enabled: Boolean) {
         ledEnabled.value = enabled
+        markPending(pending.led)
         Intent(OppoPodsAction.ACTION_LED_STATE_SET).apply {
             putExtra("enabled", enabled)
             setPackage("com.android.bluetooth")
@@ -506,6 +554,7 @@ fun MainUI(
 
     fun setPromptTone(enabled: Boolean) {
         promptToneEnabled.value = enabled
+        markPending(pending.promptTone)
         Intent(OppoPodsAction.ACTION_PROMPT_TONE_SET).apply {
             putExtra("enabled", enabled)
             putExtra("volume", promptVolume.value)
@@ -519,6 +568,7 @@ fun MainUI(
     fun setPromptVolume(volume: Int) {
         val normalized = volume.coerceIn(0, 100)
         promptVolume.value = normalized
+        markPending(pending.promptTone)
         Intent(OppoPodsAction.ACTION_PROMPT_VOLUME_SET).apply {
             putExtra("volume", normalized)
             setPackage("com.android.bluetooth")
@@ -529,6 +579,7 @@ fun MainUI(
 
     fun setHeadTracking(enabled: Boolean) {
         headTrackingEnabled.value = enabled
+        markPending(pending.headTracking)
         Intent(OppoPodsAction.ACTION_HEAD_TRACKING_SET).apply {
             putExtra("enabled", enabled)
             setPackage("com.android.bluetooth")
@@ -539,6 +590,7 @@ fun MainUI(
 
     fun setLhdc(enabled: Boolean) {
         lhdcEnabled.value = enabled
+        markPending(pending.lhdc)
         Intent(OppoPodsAction.ACTION_LHDC_SET).apply {
             putExtra("enabled", enabled)
             setPackage("com.android.bluetooth")
@@ -549,6 +601,7 @@ fun MainUI(
 
     fun setDualConnection(enabled: Boolean) {
         dualConnectionEnabled.value = enabled
+        markPending(pending.dualConnection)
         Intent(OppoPodsAction.ACTION_DUAL_CONNECTION_SET).apply {
             putExtra("enabled", enabled)
             setPackage("com.android.bluetooth")
@@ -613,6 +666,7 @@ fun MainUI(
                 setPackage("com.android.bluetooth")
                 addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             })
+            Toast.makeText(context, R.string.refresh_status_toast, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -695,6 +749,8 @@ fun MainUI(
                 dualConnectionEnabled = dualConnectionEnabled,
                 onDualConnectionChange = { setDualConnection(it) },
                 capabilities = displayCapabilities,
+                pending = pending,
+                onRefreshStatus = { refreshStatus() },
                 spatialAudioSupported = displayCapabilities.spatialAudioSupported,
                 spatialSoundSupported = displayCapabilities.spatialSoundSwitchSupported,
                 ancModes = displayCapabilities.ancModes,

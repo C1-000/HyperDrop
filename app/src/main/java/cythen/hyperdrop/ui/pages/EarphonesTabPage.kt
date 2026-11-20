@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.Dp
 import cythen.hyperdrop.R
 import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.device.DeviceCapabilities
+import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -48,6 +49,7 @@ internal fun EarphonesTabPage(
     dualConnectionEnabled: Boolean,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
+    pending: ControlPendingState,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
@@ -104,6 +106,7 @@ internal fun EarphonesTabPage(
                 dualConnectionEnabled = dualConnectionEnabled,
                 onDualConnectionChange = onDualConnectionChange,
                 capabilities = capabilities,
+                pending = pending,
                 spatialAudioSupported = spatialAudioSupported,
                 spatialSoundSupported = spatialSoundSupported,
                 ancModes = ancModes,

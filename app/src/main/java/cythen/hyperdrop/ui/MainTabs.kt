@@ -42,6 +42,7 @@ import cythen.hyperdrop.ui.dialogs.RestartScope
 import cythen.hyperdrop.ui.dialogs.RestartScopeDialog
 import cythen.hyperdrop.ui.dialogs.PodImageConfigDialog
 import cythen.hyperdrop.ui.dialogs.ColorVariantDialog
+import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.ui.pages.EarphonesTabPage
 import cythen.hyperdrop.ui.pages.HomePage
 import cythen.hyperdrop.ui.pages.SettingsPage
@@ -108,6 +109,8 @@ internal fun MainTabsScaffold(
     dualConnectionEnabled: MutableState<Boolean>,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
+    pending: ControlPendingState,
+    onRefreshStatus: () -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
@@ -264,6 +267,8 @@ internal fun MainTabsScaffold(
                         dualConnectionEnabled = dualConnectionEnabled,
                         onDualConnectionChange = onDualConnectionChange,
                         capabilities = capabilities,
+                        pending = pending,
+                        onRefreshStatus = onRefreshStatus,
                         spatialAudioSupported = spatialAudioSupported,
                         spatialSoundSupported = spatialSoundSupported,
                         ancModes = ancModes,
@@ -316,6 +321,7 @@ internal fun MainTabsScaffold(
                     onBackToDevicePicker = onBackToDevicePicker,
                     onOpenPodImageConfig = { showPodImageDialog = true },
                     onOpenColorVariant = { showColorVariantDialog = true },
+                    onRefreshStatus = onRefreshStatus,
                     onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                 )
             }
@@ -450,6 +456,8 @@ private fun EarphonesTabShell(
     dualConnectionEnabled: MutableState<Boolean>,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
+    pending: ControlPendingState,
+    onRefreshStatus: () -> Unit,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
@@ -489,6 +497,7 @@ private fun EarphonesTabShell(
                             EarphoneDetailActions(
                                 onOpenPodImageConfig = onOpenPodImageConfig,
                                 onOpenColorVariant = onOpenColorVariant,
+                                onRefreshStatus = onRefreshStatus,
                                 onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                             )
                         }
@@ -526,6 +535,7 @@ private fun EarphonesTabShell(
             dualConnectionEnabled = dualConnectionEnabled.value,
             onDualConnectionChange = onDualConnectionChange,
             capabilities = capabilities,
+            pending = pending,
             spatialAudioSupported = spatialAudioSupported,
             spatialSoundSupported = spatialSoundSupported,
             ancModes = ancModes,
@@ -619,6 +629,7 @@ private fun LandscapeDetailActions(
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
     onOpenColorVariant: () -> Unit,
+    onRefreshStatus: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     IconButton(
@@ -630,6 +641,18 @@ private fun LandscapeDetailActions(
         Icon(imageVector = MiuixIcons.Back, contentDescription = "Back")
     }
     Box(Modifier.fillMaxSize()) {
+        IconButton(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 8.dp, end = 152.dp)
+                .zIndex(1f),
+            onClick = onRefreshStatus,
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Refresh,
+                contentDescription = stringResource(R.string.refresh_status),
+            )
+        }
         IconButton(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -673,8 +696,15 @@ private fun LandscapeDetailActions(
 private fun EarphoneDetailActions(
     onOpenPodImageConfig: () -> Unit,
     onOpenColorVariant: () -> Unit,
+    onRefreshStatus: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
+    IconButton(onClick = onRefreshStatus) {
+        Icon(
+            imageVector = MiuixIcons.Refresh,
+            contentDescription = stringResource(R.string.refresh_status),
+        )
+    }
     IconButton(onClick = onOpenColorVariant) {
         Icon(
             imageVector = MiuixIcons.Theme,

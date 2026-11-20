@@ -35,6 +35,7 @@ import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.config.DeviceImageCatalog
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
+import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.ui.components.AncSwitch
 import cythen.hyperdrop.ui.components.PodStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -81,6 +82,7 @@ fun PodDetailPage(
     dualConnectionEnabled: Boolean = false,
     onDualConnectionChange: (Boolean) -> Unit = {},
     capabilities: DeviceCapabilities = DeviceCapabilities.NONE,
+    pending: ControlPendingState? = null,
     boxImagePath: String? = null,
     deviceImageKey: String? = null,
     colorVariantKey: String? = null,
@@ -162,6 +164,7 @@ fun PodDetailPage(
                     dualConnectionEnabled = dualConnectionEnabled,
                     onDualConnectionChange = onDualConnectionChange,
                     capabilities = capabilities,
+                    pending = pending,
                     showAppSettingsEntry = showAppSettingsEntry,
                     onOpenAppSettings = onOpenAppSettings,
                     showSystemSettingsEntry = showSystemSettingsEntry,
@@ -220,6 +223,7 @@ fun PodDetailPage(
             dualConnectionEnabled = dualConnectionEnabled,
             onDualConnectionChange = onDualConnectionChange,
             capabilities = capabilities,
+            pending = pending,
             showAppSettingsEntry = showAppSettingsEntry,
             onOpenAppSettings = onOpenAppSettings,
             showSystemSettingsEntry = showSystemSettingsEntry,
@@ -274,6 +278,7 @@ private fun LazyListScope.podControlItems(
     dualConnectionEnabled: Boolean,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
+    pending: ControlPendingState?,
     showAppSettingsEntry: Boolean,
     onOpenAppSettings: () -> Unit,
     showSystemSettingsEntry: Boolean,
@@ -281,6 +286,8 @@ private fun LazyListScope.podControlItems(
     controlsEnabled: Boolean,
     bottomContentPadding: Dp
 ) {
+    fun busy(flag: androidx.compose.runtime.MutableState<Boolean>?): Boolean =
+        !controlsEnabled || (flag?.value == true)
     val spatialAudioValues = listOf(
         ConfigManager.SPATIAL_AUDIO_OFF,
         ConfigManager.SPATIAL_AUDIO_FIXED,
@@ -310,7 +317,8 @@ private fun LazyListScope.podControlItems(
                 ancModes = ancModes,
                 transparencyVocalEnhancement = transparencyVocalEnhancement,
                 onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
-                enabled = controlsEnabled
+                enabled = controlsEnabled && pending?.anc?.value != true &&
+                    pending?.transparency?.value != true && pending?.smartAncLevel?.value != true
             )
         }
     }
@@ -331,7 +339,8 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.pudding_gain_summary),
                     items = gainOptions,
                     selectedIndex = gainLevel.coerceIn(0, gainOptions.size - 1),
-                    onSelectedIndexChange = { onGainLevelChange(it.coerceIn(0, gainOptions.size - 1)) }
+                    onSelectedIndexChange = { onGainLevelChange(it.coerceIn(0, gainOptions.size - 1)) },
+                    enabled = busy(pending?.gain)
                 )
             }
         }
@@ -345,7 +354,8 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.pudding_led_title),
                     summary = stringResource(R.string.pudding_led_summary),
                     checked = ledEnabled,
-                    onCheckedChange = onLedEnabledChange
+                    onCheckedChange = onLedEnabledChange,
+                    enabled = busy(pending?.led)
                 )
             }
         }
@@ -359,7 +369,8 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_prompt_tone_title),
                     summary = stringResource(R.string.control_prompt_tone_summary),
                     checked = promptToneEnabled,
-                    onCheckedChange = onPromptToneChange
+                    onCheckedChange = onPromptToneChange,
+                    enabled = busy(pending?.promptTone)
                 )
             }
         }
@@ -375,6 +386,7 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_prompt_volume_title),
                     summary = stringResource(R.string.control_prompt_volume_summary),
                     valueRange = 0f..100f,
+                    enabled = busy(pending?.promptTone),
                 )
             }
         }
@@ -388,7 +400,8 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_head_tracking_title),
                     summary = stringResource(R.string.control_head_tracking_summary),
                     checked = headTrackingEnabled,
-                    onCheckedChange = onHeadTrackingChange
+                    onCheckedChange = onHeadTrackingChange,
+                    enabled = busy(pending?.headTracking)
                 )
             }
         }
@@ -402,7 +415,8 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_lhdc_title),
                     summary = stringResource(R.string.control_lhdc_summary),
                     checked = lhdcEnabled,
-                    onCheckedChange = onLhdcChange
+                    onCheckedChange = onLhdcChange,
+                    enabled = busy(pending?.lhdc)
                 )
             }
         }
@@ -416,7 +430,8 @@ private fun LazyListScope.podControlItems(
                     title = stringResource(R.string.control_dual_connection_title),
                     summary = stringResource(R.string.control_dual_connection_summary),
                     checked = dualConnectionEnabled,
-                    onCheckedChange = onDualConnectionChange
+                    onCheckedChange = onDualConnectionChange,
+                    enabled = busy(pending?.dualConnection)
                 )
             }
         }

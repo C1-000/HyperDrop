@@ -210,6 +210,32 @@ class DeviceSession {
         }
     }
 
+    private fun changeUIPromptTone(enabled: Boolean, volume: Int, index: Int) {
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_PROMPT_TONE_CHANGED) {
+            putExtra("enabled", enabled)
+            putExtra("volume", volume)
+            putExtra("index", index)
+        }
+    }
+
+    private fun changeUIHeadTracking(enabled: Boolean) {
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED) {
+            putExtra("enabled", enabled)
+        }
+    }
+
+    private fun changeUILhdc(enabled: Boolean) {
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_LHDC_CHANGED) {
+            putExtra("enabled", enabled)
+        }
+    }
+
+    private fun changeUIDualConnection(enabled: Boolean) {
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED) {
+            putExtra("enabled", enabled)
+        }
+    }
+
     fun handleUIEvent(intent: Intent) {
         if (yielded && YIELD_BLOCKED_ACTIONS.contains(intent.action ?: "")) {
             Log.d(TAG, "dropped UI event while yielded: ${intent.action}")
@@ -930,14 +956,30 @@ class DeviceSession {
                 changeUILedState(currentLedEnabled)
                 Log.i(TAG, "LED enabled: $currentLedEnabled")
             }
-            is GaiaReport.SpatialAudio -> Log.i(TAG, "spatial audio: ${report.enabled}")
-            is GaiaReport.HeadTracking -> Log.i(TAG, "head tracking: ${report.enabled}")
-            is GaiaReport.VoiceConfig -> Log.i(
-                TAG,
-                "voice config: enabled=${report.enabled} volume=${report.volume} index=${report.index}",
-            )
-            is GaiaReport.Lhdc -> Log.i(TAG, "LHDC: ${report.enabled}")
-            is GaiaReport.DualConnection -> Log.i(TAG, "dual connection: ${report.enabled}")
+            is GaiaReport.SpatialAudio -> {
+                currentSpatialAudioMode = if (report.enabled) 1 else 0
+                changeUISpatialAudioStatus(currentSpatialAudioMode)
+                Log.i(TAG, "spatial audio: ${report.enabled}")
+            }
+            is GaiaReport.HeadTracking -> {
+                changeUIHeadTracking(report.enabled)
+                Log.i(TAG, "head tracking: ${report.enabled}")
+            }
+            is GaiaReport.VoiceConfig -> {
+                changeUIPromptTone(report.enabled, report.volume, report.index)
+                Log.i(
+                    TAG,
+                    "voice config: enabled=${report.enabled} volume=${report.volume} index=${report.index}",
+                )
+            }
+            is GaiaReport.Lhdc -> {
+                changeUILhdc(report.enabled)
+                Log.i(TAG, "LHDC: ${report.enabled}")
+            }
+            is GaiaReport.DualConnection -> {
+                changeUIDualConnection(report.enabled)
+                Log.i(TAG, "dual connection: ${report.enabled}")
+            }
             is GaiaReport.SupportedFeatures -> Log.i(TAG, "supported features: ${report.features}")
             GaiaReport.GaiaNegotiation -> {
                 Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
