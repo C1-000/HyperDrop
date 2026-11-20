@@ -136,8 +136,14 @@
     <string name="control_head_tracking_summary">Enable spatial head tracking</string>
     <string name="control_lhdc_title">LHDC codec</string>
     <string name="control_lhdc_summary">Enable the high-resolution LHDC codec</string>
+    <string name="control_lhdc_reconnect_note">Switching LHDC briefly disconnects and reconnects the headset</string>
     <string name="control_dual_connection_title">Dual-device connection</string>
     <string name="control_dual_connection_summary">Connect to two devices at once</string>
+
+    <string name="conflict_lhdc_dual_title">LHDC and dual-device connection cannot be on together</string>
+    <string name="conflict_lhdc_dual_message_lhdc">Turning on LHDC will turn off dual-device connection.</string>
+    <string name="conflict_lhdc_dual_message_dual">Turning on dual-device connection will turn off LHDC.</string>
+    <string name="conflict_switch">Switch</string>
 
     <string name="device_adaptation_title">Device adaptation</string>
     <string name="device_adaptation_summary">Supported models and verification status</string>

@@ -570,7 +570,9 @@ fun MainUI(
         promptVolume.value = normalized
         markPending(pending.promptTone)
         Intent(OppoPodsAction.ACTION_PROMPT_VOLUME_SET).apply {
+            putExtra("enabled", promptToneEnabled.value)
             putExtra("volume", normalized)
+            putExtra("index", 0)
             setPackage("com.android.bluetooth")
             addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             context.sendBroadcast(this)

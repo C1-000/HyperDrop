@@ -15,7 +15,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -37,6 +44,9 @@ import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.ui.components.AncSwitch
+import cythen.hyperdrop.ui.components.MutualExclusionDialog
+import cythen.hyperdrop.ui.components.MutualExclusionTarget
+import cythen.hyperdrop.ui.components.rememberMutualExclusionState
 import cythen.hyperdrop.ui.components.PodStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import top.yukonga.miuix.kmp.basic.Card
@@ -95,6 +105,53 @@ fun PodDetailPage(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey, colorVariantKey).box
     val imagePainter = rememberPodImagePainter(boxImagePath, builtinBoxRes)
+
+    // LHDC and dual-device connection are mutually exclusive in firmware. Route
+    // both switches through a guard that asks for confirmation before switching.
+    val exclusion = rememberMutualExclusionState()
+    val exclusionScope = rememberCoroutineScope()
+    val handleLhdcChange: (Boolean) -> Unit = { wanted ->
+        if (
+            exclusion.request(
+                capabilities.lhdcSupported,
+                capabilities.dualConnectionSupported,
+                lhdcEnabled,
+                dualConnectionEnabled,
+                MutualExclusionTarget.LHDC,
+                wanted,
+            )
+        ) {
+            onLhdcChange(wanted)
+        }
+    }
+    val handleDualChange: (Boolean) -> Unit = { wanted ->
+        if (
+            exclusion.request(
+                capabilities.lhdcSupported,
+                capabilities.dualConnectionSupported,
+                lhdcEnabled,
+                dualConnectionEnabled,
+                MutualExclusionTarget.DUAL_CONNECTION,
+                wanted,
+            )
+        ) {
+            onDualConnectionChange(wanted)
+        }
+    }
+    val applyExclusion: (MutualExclusionTarget) -> Unit = { target ->
+        exclusionScope.launch {
+            if (target == MutualExclusionTarget.LHDC) {
+                onDualConnectionChange(false)
+                delay(300)
+                onLhdcChange(true)
+            } else {
+                onLhdcChange(false)
+                delay(300)
+                onDualConnectionChange(true)
+            }
+        }
+    }
+    MutualExclusionDialog(state = exclusion, onApply = applyExclusion)
 
     if (isLandscape) {
         Row(
@@ -160,9 +217,9 @@ fun PodDetailPage(
                     headTrackingEnabled = headTrackingEnabled,
                     onHeadTrackingChange = onHeadTrackingChange,
                     lhdcEnabled = lhdcEnabled,
-                    onLhdcChange = onLhdcChange,
+                    onLhdcChange = handleLhdcChange,
                     dualConnectionEnabled = dualConnectionEnabled,
-                    onDualConnectionChange = onDualConnectionChange,
+                    onDualConnectionChange = handleDualChange,
                     capabilities = capabilities,
                     pending = pending,
                     showAppSettingsEntry = showAppSettingsEntry,
@@ -362,8 +419,10 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    // 3. Prompt tone on/off.
-    if (capabilities.promptToneSupported) {
+    // 3. Prompt tone on/off, with volume slider embedded in the same row (miuix style).
+    //    The slider keeps a local value while dragging and only reports on release,
+    //    so the control never greys out mid-drag.
+    if (capabilities.promptToneSupported || capabilities.promptVolumeSupported) {
         item {
             Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 SwitchPreference(
@@ -371,23 +430,29 @@ private fun LazyListScope.podControlItems(
                     summary = stringResource(R.string.control_prompt_tone_summary),
                     checked = promptToneEnabled,
                     onCheckedChange = onPromptToneChange,
-                    enabled = controlEnabled(pending?.promptTone)
-                )
-            }
-        }
-    }
-
-    // 4. Prompt tone volume (0..100).
-    if (capabilities.promptVolumeSupported) {
-        item {
-            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                SliderPreference(
-                    value = promptVolume.coerceIn(0, 100).toFloat(),
-                    onValueChange = { onPromptVolumeChange(it.toInt().coerceIn(0, 100)) },
-                    title = stringResource(R.string.control_prompt_volume_title),
-                    summary = stringResource(R.string.control_prompt_volume_summary),
-                    valueRange = 0f..100f,
                     enabled = controlEnabled(pending?.promptTone),
+                    bottomAction = if (capabilities.promptVolumeSupported) {
+                        @Composable {
+                            var localVolume by remember {
+                                mutableIntStateOf(promptVolume.coerceIn(0, 100))
+                            }
+                            LaunchedEffect(promptVolume) {
+                                localVolume = promptVolume.coerceIn(0, 100)
+                            }
+                            SliderPreference(
+                                value = localVolume.toFloat(),
+                                onValueChange = { localVolume = it.toInt().coerceIn(0, 100) },
+                                onValueChangeFinished = { onPromptVolumeChange(localVolume) },
+                                title = stringResource(R.string.control_prompt_volume_title),
+                                valueText = "$localVolume%",
+                                valueRange = 0f..100f,
+                                enabled = controlEnabled(pending?.promptTone),
+                                insideMargin = PaddingValues(horizontal = 0.dp),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -408,13 +473,14 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    // 6. LHDC codec.
+    // 6. LHDC codec. Switching codec makes the headset briefly disconnect and
+    //    reconnect; show a static note so the user isn't surprised.
     if (capabilities.lhdcSupported) {
         item {
             Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 SwitchPreference(
                     title = stringResource(R.string.control_lhdc_title),
-                    summary = stringResource(R.string.control_lhdc_summary),
+                    summary = stringResource(R.string.control_lhdc_reconnect_note),
                     checked = lhdcEnabled,
                     onCheckedChange = onLhdcChange,
                     enabled = controlEnabled(pending?.lhdc)

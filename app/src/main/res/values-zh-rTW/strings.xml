@@ -136,8 +136,14 @@
     <string name="control_head_tracking_summary">開啟空間音訊頭部追蹤</string>
     <string name="control_lhdc_title">LHDC 編碼</string>
     <string name="control_lhdc_summary">開啟高解析度 LHDC 編碼</string>
+    <string name="control_lhdc_reconnect_note">切換 LHDC 時耳機會短暫斷開並自動重新連線</string>
     <string name="control_dual_connection_title">雙裝置連線</string>
     <string name="control_dual_connection_summary">同時連線兩台裝置</string>
+
+    <string name="conflict_lhdc_dual_title">LHDC 與雙裝置連線不能同時開啟</string>
+    <string name="conflict_lhdc_dual_message_lhdc">開啟 LHDC 會關閉雙裝置連線。</string>
+    <string name="conflict_lhdc_dual_message_dual">開啟雙裝置連線會關閉 LHDC。</string>
+    <string name="conflict_switch">切換</string>
 
     <string name="device_adaptation_title">裝置適配情況</string>
     <string name="device_adaptation_summary">已適配機型與驗證狀態</string>

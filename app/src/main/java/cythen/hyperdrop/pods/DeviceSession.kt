@@ -91,6 +91,11 @@ class DeviceSession {
     private var currentEqPreset: Int = -1
     private var currentGainLevel = DEFAULT_GAIN_LEVEL
     private var currentLedEnabled = true
+    /** Last voice-config report from the device, used as a safe default when the UI
+     *  omits an extra in the prompt-volume set broadcast. */
+    private var currentPromptToneEnabled: Boolean = false
+    private var currentPromptVolume: Int = 50
+    private var currentVoiceIndex: Int = 0
     private var lastKnownLeftBattery: Int = 0
     private var lastKnownRightBattery: Int = 0
     private var lastKnownCaseBattery: Int = 0
@@ -322,7 +327,14 @@ class DeviceSession {
                 setPromptTone(enabled, volume, index)
             }
             OppoPodsAction.ACTION_PROMPT_VOLUME_SET -> {
-                setPromptVolume(intent.getIntExtra("volume", 50))
+                val enabled = if (intent.hasExtra("enabled")) {
+                    intent.getBooleanExtra("enabled", false)
+                } else {
+                    currentPromptToneEnabled
+                }
+                val index = intent.getIntExtra("index", currentVoiceIndex)
+                val volume = intent.getIntExtra("volume", currentPromptVolume)
+                setPromptVolume(enabled, volume, index)
             }
             OppoPodsAction.ACTION_HEAD_TRACKING_SET -> {
                 setHeadTracking(intent.getBooleanExtra("enabled", false))
@@ -966,6 +978,9 @@ class DeviceSession {
                 Log.i(TAG, "head tracking: ${report.enabled}")
             }
             is GaiaReport.VoiceConfig -> {
+                currentPromptToneEnabled = report.enabled
+                currentPromptVolume = report.volume
+                currentVoiceIndex = report.index
                 changeUIPromptTone(report.enabled, report.volume, report.index)
                 Log.i(
                     TAG,
@@ -1125,8 +1140,11 @@ class DeviceSession {
     }
 
     /** Prompt volume only; keeps the current enabled/index values as reported by the device. */
-    fun setPromptVolume(volume: Int) {
-        setPromptTone(true, volume.coerceIn(0, 100), 0)
+    fun setPromptVolume(enabled: Boolean, volume: Int, index: Int) {
+        currentPromptToneEnabled = enabled
+        currentPromptVolume = volume.coerceIn(0, 100)
+        currentVoiceIndex = index
+        setPromptTone(enabled, currentPromptVolume, index)
     }
 
     /** LHDC codec toggle (feature 0x10). */
