@@ -42,7 +42,13 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "HyperDrop-DeviceSession"
 private const val AUTO_RECONNECT_DELAY_MS = 120_000L
-private const val APP_UI_ACTIVE_TIMEOUT_MS = 75_000L
+// Safety net for a missed ACTION_PODS_UI_CLOSED. The UI is what really decides active
+// state; a long window keeps status echoes flowing while the earbuds page stays open
+// (an LHDC codec switch can drop the RFCOMM link for far longer than the old 75s).
+private const val APP_UI_ACTIVE_TIMEOUT_MS = 600_000L
+// While an optimistic LHDC/dual write awaits confirmation, contradictory reports are
+// ignored for this long (mirrors miuixmoondrop's "keep optimistic value on timeout").
+private const val WRITE_CONFIRM_GRACE_MS = 5_000L
 private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
 
 /** UI/system write actions that must not reach the earbuds while control is yielded. */
@@ -96,6 +102,13 @@ class DeviceSession {
     private var currentPromptToneEnabled: Boolean = false
     private var currentPromptVolume: Int = 50
     private var currentVoiceIndex: Int = 0
+    private var currentLhdcEnabled: Boolean = false
+    private var currentDualConnectionEnabled: Boolean = false
+    private var currentHeadTrackingEnabled: Boolean = false
+    /** Timestamp until which a contradictory device report for LHDC is treated as a
+     *  transient reconnect artifact and ignored (see [setLhdc]). */
+    private var lhdcWriteGraceUntilMs = 0L
+    private var dualWriteGraceUntilMs = 0L
     private var lastKnownLeftBattery: Int = 0
     private var lastKnownRightBattery: Int = 0
     private var lastKnownCaseBattery: Int = 0
@@ -272,6 +285,10 @@ class DeviceSession {
                 changeUIEqPreset(currentEqPreset)
                 changeUIGainLevel(currentGainLevel)
                 changeUILedState(currentLedEnabled)
+                changeUIPromptTone(currentPromptToneEnabled, currentPromptVolume, currentVoiceIndex)
+                changeUIHeadTracking(currentHeadTrackingEnabled)
+                changeUILhdc(currentLhdcEnabled)
+                changeUIDualConnection(currentDualConnectionEnabled)
                 if (::mDevice.isInitialized && isConnected) {
                     // Our own UI still needs to know which device is connected, otherwise the
                     // popup title falls back to the app name. While yielded we only refresh the
@@ -974,6 +991,7 @@ class DeviceSession {
                 Log.i(TAG, "spatial audio: ${report.enabled}")
             }
             is GaiaReport.HeadTracking -> {
+                currentHeadTrackingEnabled = report.enabled
                 changeUIHeadTracking(report.enabled)
                 Log.i(TAG, "head tracking: ${report.enabled}")
             }
@@ -988,12 +1006,32 @@ class DeviceSession {
                 )
             }
             is GaiaReport.Lhdc -> {
-                changeUILhdc(report.enabled)
-                Log.i(TAG, "LHDC: ${report.enabled}")
+                // An LHDC switch drops the RFCOMM link; during the write-confirm grace a
+                // transient OFF report is a reconnect artifact, not a real state change.
+                if (report.enabled != currentLhdcEnabled &&
+                    !report.enabled &&
+                    SystemClock.elapsedRealtime() < lhdcWriteGraceUntilMs
+                ) {
+                    Log.i(TAG, "LHDC: ignoring transient OFF during reconnect grace")
+                } else {
+                    currentLhdcEnabled = report.enabled
+                    lhdcWriteGraceUntilMs = 0L
+                    changeUILhdc(report.enabled)
+                    Log.i(TAG, "LHDC: ${report.enabled}")
+                }
             }
             is GaiaReport.DualConnection -> {
-                changeUIDualConnection(report.enabled)
-                Log.i(TAG, "dual connection: ${report.enabled}")
+                if (report.enabled != currentDualConnectionEnabled &&
+                    !report.enabled &&
+                    SystemClock.elapsedRealtime() < dualWriteGraceUntilMs
+                ) {
+                    Log.i(TAG, "dual connection: ignoring transient OFF during reconnect grace")
+                } else {
+                    currentDualConnectionEnabled = report.enabled
+                    dualWriteGraceUntilMs = 0L
+                    changeUIDualConnection(report.enabled)
+                    Log.i(TAG, "dual connection: ${report.enabled}")
+                }
             }
             is GaiaReport.SupportedFeatures -> Log.i(TAG, "supported features: ${report.features}")
             GaiaReport.GaiaNegotiation -> {
@@ -1130,6 +1168,12 @@ class DeviceSession {
     /** Voice prompt on/off with volume (0..100) and prompt index. */
     fun setPromptTone(enabled: Boolean, volume: Int = 50, index: Int = 0) {
         val packet = commandTable().setPromptTone(enabled, volume, index) ?: return
+        // Optimistic echo like gain/LED: reflect the requested state immediately, then
+        // let the readback confirm (or correct) it.
+        currentPromptToneEnabled = enabled
+        currentPromptVolume = volume.coerceIn(0, 100)
+        currentVoiceIndex = index
+        changeUIPromptTone(enabled, currentPromptVolume, index)
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(GaiaTransport.v4(packet), "prompt tone")
             commandTable().queryVoiceConfig?.let { q ->
@@ -1147,9 +1191,13 @@ class DeviceSession {
         setPromptTone(enabled, currentPromptVolume, index)
     }
 
-    /** LHDC codec toggle (feature 0x10). */
+    /** LHDC codec toggle (feature 0x10). Uses optimistic echo + a readback grace
+     *  window so the codec-switch reconnect cannot bounce the switch back. */
     fun setLhdc(enabled: Boolean) {
         val packet = commandTable().setLhdc(enabled) ?: return
+        currentLhdcEnabled = enabled
+        lhdcWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
+        changeUILhdc(enabled)
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(GaiaTransport.v4(packet), "LHDC")
             commandTable().queryLhdc?.let { q ->
@@ -1159,9 +1207,12 @@ class DeviceSession {
         }
     }
 
-    /** Dual-connection toggle (feature 0x14). */
+    /** Dual-connection toggle (feature 0x14), same optimistic + grace strategy. */
     fun setDualConnection(enabled: Boolean) {
         val packet = commandTable().setDualConnection(enabled) ?: return
+        currentDualConnectionEnabled = enabled
+        dualWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
+        changeUIDualConnection(enabled)
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(GaiaTransport.v4(packet), "dual connection")
             commandTable().queryDualConnection?.let { q ->
@@ -1266,10 +1317,16 @@ class DeviceSession {
         delay(100)
         sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
         delay(100)
+        // Space the feature queries too: back-to-back RFCOMM frames can be coalesced
+        // by the earbud and one of the responses lost.
         commandTable().querySpatialAudio?.let { sendPacketSafe(GaiaTransport.v4(it), "spatial audio query") }
+        delay(100)
         commandTable().queryHeadTracking?.let { sendPacketSafe(GaiaTransport.v4(it), "head tracking query") }
+        delay(100)
         commandTable().queryVoiceConfig?.let { sendPacketSafe(GaiaTransport.v4(it), "voice config query") }
+        delay(100)
         commandTable().queryLhdc?.let { sendPacketSafe(GaiaTransport.v4(it), "LHDC query") }
+        delay(100)
         commandTable().queryDualConnection?.let { sendPacketSafe(GaiaTransport.v4(it), "dual connection query") }
         delay(100)
         sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))

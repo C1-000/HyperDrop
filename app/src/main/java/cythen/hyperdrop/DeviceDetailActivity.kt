@@ -101,6 +101,11 @@ class DeviceDetailActivity : ComponentActivity() {
                 val anc = remember { mutableStateOf(NoiseControlMode.OFF) }
                 val gain = remember { mutableStateOf(1) }
                 val led = remember { mutableStateOf(true) }
+                val promptToneEnabled = remember { mutableStateOf(false) }
+                val promptVolume = remember { mutableStateOf(50) }
+                val headTrackingEnabled = remember { mutableStateOf(false) }
+                val lhdcEnabled = remember { mutableStateOf(false) }
+                val dualConnectionEnabled = remember { mutableStateOf(false) }
                 val deviceName = remember { mutableStateOf("MOONDROP Pudding") }
                 val controlsYielded = remember { mutableStateOf(false) }
                 val capabilities = DeviceRegistry.detectDeviceCapabilities(deviceName.value)
@@ -136,6 +141,19 @@ class DeviceDetailActivity : ComponentActivity() {
                                 OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED -> {
                                     led.value = intent.getBooleanExtra("enabled", led.value)
                                 }
+                                OppoPodsAction.ACTION_PROMPT_TONE_CHANGED -> {
+                                    promptToneEnabled.value = intent.getBooleanExtra("enabled", promptToneEnabled.value)
+                                    promptVolume.value = intent.getIntExtra("volume", promptVolume.value).coerceIn(0, 100)
+                                }
+                                OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED -> {
+                                    headTrackingEnabled.value = intent.getBooleanExtra("enabled", headTrackingEnabled.value)
+                                }
+                                OppoPodsAction.ACTION_LHDC_CHANGED -> {
+                                    lhdcEnabled.value = intent.getBooleanExtra("enabled", lhdcEnabled.value)
+                                }
+                                OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED -> {
+                                    dualConnectionEnabled.value = intent.getBooleanExtra("enabled", dualConnectionEnabled.value)
+                                }
                                 OppoPodsAction.ACTION_CONTROL_YIELDED -> {
                                     controlsYielded.value = true
                                 }
@@ -151,6 +169,10 @@ class DeviceDetailActivity : ComponentActivity() {
                         addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)
                         addAction(OppoPodsAction.ACTION_PODS_GAIN_LEVEL_CHANGED)
                         addAction(OppoPodsAction.ACTION_PODS_LED_STATE_CHANGED)
+                        addAction(OppoPodsAction.ACTION_PROMPT_TONE_CHANGED)
+                        addAction(OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED)
+                        addAction(OppoPodsAction.ACTION_LHDC_CHANGED)
+                        addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED)
                         addAction(OppoPodsAction.ACTION_CONTROL_YIELDED)
                         addAction(OppoPodsAction.ACTION_CONTROL_RESUMED)
                     }, Context.RECEIVER_EXPORTED)
@@ -215,6 +237,46 @@ class DeviceDetailActivity : ComponentActivity() {
                             onLedEnabledChange = { enabled ->
                                 led.value = enabled
                                 sendToBluetooth(OppoPodsAction.ACTION_LED_STATE_SET) {
+                                    putExtra("enabled", enabled)
+                                }
+                            },
+                            promptToneEnabled = promptToneEnabled.value,
+                            onPromptToneChange = { enabled ->
+                                promptToneEnabled.value = enabled
+                                sendToBluetooth(OppoPodsAction.ACTION_PROMPT_TONE_SET) {
+                                    putExtra("enabled", enabled)
+                                    putExtra("volume", promptVolume.value)
+                                    putExtra("index", 0)
+                                }
+                            },
+                            promptVolume = promptVolume.value,
+                            onPromptVolumeChange = { volume ->
+                                val normalized = volume.coerceIn(0, 100)
+                                promptVolume.value = normalized
+                                sendToBluetooth(OppoPodsAction.ACTION_PROMPT_VOLUME_SET) {
+                                    putExtra("enabled", promptToneEnabled.value)
+                                    putExtra("volume", normalized)
+                                    putExtra("index", 0)
+                                }
+                            },
+                            headTrackingEnabled = headTrackingEnabled.value,
+                            onHeadTrackingChange = { enabled ->
+                                headTrackingEnabled.value = enabled
+                                sendToBluetooth(OppoPodsAction.ACTION_HEAD_TRACKING_SET) {
+                                    putExtra("enabled", enabled)
+                                }
+                            },
+                            lhdcEnabled = lhdcEnabled.value,
+                            onLhdcChange = { enabled ->
+                                lhdcEnabled.value = enabled
+                                sendToBluetooth(OppoPodsAction.ACTION_LHDC_SET) {
+                                    putExtra("enabled", enabled)
+                                }
+                            },
+                            dualConnectionEnabled = dualConnectionEnabled.value,
+                            onDualConnectionChange = { enabled ->
+                                dualConnectionEnabled.value = enabled
+                                sendToBluetooth(OppoPodsAction.ACTION_DUAL_CONNECTION_SET) {
                                     putExtra("enabled", enabled)
                                 }
                             },
