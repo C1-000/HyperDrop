@@ -27,6 +27,12 @@ object OppoPodsAction {
     const val ACTION_PODS_GAIN_LEVEL_CHANGED = "cythen.hyperdrop.action.pods_gain_level_changed"
     const val ACTION_LED_STATE_SET = "cythen.hyperdrop.action.led_state_set"
     const val ACTION_PODS_LED_STATE_CHANGED = "cythen.hyperdrop.action.pods_led_state_changed"
+    // Extended GAIA feature controls (feature-profile gated).
+    const val ACTION_PROMPT_TONE_SET = "cythen.hyperdrop.action.prompt_tone_set"
+    const val ACTION_PROMPT_VOLUME_SET = "cythen.hyperdrop.action.prompt_volume_set"
+    const val ACTION_HEAD_TRACKING_SET = "cythen.hyperdrop.action.head_tracking_set"
+    const val ACTION_LHDC_SET = "cythen.hyperdrop.action.lhdc_set"
+    const val ACTION_DUAL_CONNECTION_SET = "cythen.hyperdrop.action.dual_connection_set"
     const val ACTION_CYCLE_ANC = "cythen.hyperdrop.action.cycle_anc"
     const val ACTION_RFCOMM_LOG_CONNECT = "cythen.hyperdrop.action.rfcomm_log_connect"
     const val ACTION_RFCOMM_LOG_DISCONNECT = "cythen.hyperdrop.action.rfcomm_log_disconnect"

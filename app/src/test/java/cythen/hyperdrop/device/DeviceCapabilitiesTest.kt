@@ -8,6 +8,7 @@ import cythen.hyperdrop.device.StandardBluetoothProfile
 import cythen.hyperdrop.pods.NoiseControlMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -71,7 +72,34 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun `profile lookup by id`() {
-        assertEquals(PuddingProfile, DeviceRegistry.profileById("pudding"))
+        // PuddingProfile is now a delegating alias for DeviceModels.pudding, so compare ids.
+        assertEquals("pudding", DeviceRegistry.profileById("pudding").id)
         assertEquals(StandardBluetoothProfile, DeviceRegistry.profileById("does-not-exist"))
+    }
+
+    @Test
+    fun `model matching is data driven with verified and inferred states`() {
+        assertEquals("pudding", DeviceModels.match("MOONDROP PUDDING")?.id)
+        assertEquals("mirage", DeviceModels.match("海市蜃楼")?.id)
+        assertTrue(DeviceModels.match("MOONDROP PUDDING")!!.verified)
+        assertTrue(DeviceModels.match("MOONDROP MIRAGE")!!.verified)
+        assertFalse(DeviceModels.match("MOONDROP EDGE")!!.verified)
+        // Unmatched MOONDROP name falls back to the conservative inferred profile.
+        assertEquals("fallback", DeviceModels.match("MOONDROP something new")?.id)
+        // Non-MOONDROP name is not a supported device.
+        assertNull(DeviceModels.match("Some random headphones"))
+        assertEquals(2, DeviceModels.models.count { it.verified })
+    }
+
+    @Test
+    fun `inferred model caps carry ANC path and gain mapping`() {
+        val edge = DeviceRegistry.profileById("edge")
+        assertTrue(edge.capabilities.gainSupported)
+        assertEquals(3, edge.capabilities.ancModes.size)
+        // Pudding ANC set table is indexed by UI status 1..5.
+        val pudding = DeviceModels.pudding.capabilities
+        assertEquals(0, pudding.ancSetMap[1])  // UI status 1 = OFF -> wire 0
+        assertEquals(4, pudding.ancSetMap[4])  // ADAPTIVE -> wire 4
+        assertEquals(3, pudding.ancSetMap[5])  // WIND_REDUCTION -> wire 3
     }
 }

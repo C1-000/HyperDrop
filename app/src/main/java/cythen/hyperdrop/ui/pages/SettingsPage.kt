@@ -44,7 +44,8 @@ fun SettingsPage(
     fakeDeviceId: MutableState<String> = mutableStateOf(ConfigManager.DEFAULT_FAKE_DEVICE_ID),
     onFakeDeviceIdChange: (String) -> Unit = {},
     onOpenTheme: () -> Unit = {},
-    onOpenAbout: () -> Unit = {}
+    onOpenAbout: () -> Unit = {},
+    onOpenDeviceAdaptation: () -> Unit = {},
 ) {
     val languageValues = listOf(
         AppLocale.TRADITIONAL_CHINESE,
@@ -161,6 +162,16 @@ fun SettingsPage(
                         collapseOnSelection = false,
                     )
                 }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.padding(top = 12.dp)) {
+                BasicComponent(
+                    title = stringResource(R.string.device_adaptation_title),
+                    summary = stringResource(R.string.device_adaptation_summary),
+                    onClick = onOpenDeviceAdaptation
+                )
             }
         }
 

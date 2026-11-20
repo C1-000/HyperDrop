@@ -63,12 +63,6 @@
     <string name="custom_image_selected">已選擇自訂圖片</string>
     <string name="custom_image_default">使用預設圖片</string>
     <string name="custom_image_restore_default">還原預設圖片</string>
-    <string name="import_melody_images">匯入圖片</string>
-    <string name="import_melody_images_summary">從歡律匯入耳機型號圖片</string>
-    <string name="import_melody_images_hint">請提前在歡律中連線一次耳機。</string>
-    <string name="import_melody_images_empty">未找到歡律耳機型號圖片。</string>
-    <string name="import_melody_images_root_required">請檢查 ROOT 權限。</string>
-    <string name="import_melody_images_action">一鍵匯入</string>
     <string name="theme_title">主題</string>
     <string name="theme_follow_system">跟隨系統</string>
     <string name="theme_light">淺色</string>
@@ -76,6 +70,10 @@
     <string name="theme_color">主題顏色</string>
     <string name="theme_color_summary">選擇應用強調色樣式</string>
     <string name="color_default">預設</string>
+    <string name="color_variant_title">裝置配色</string>
+    <string name="color_variant_black">黑色</string>
+    <string name="color_variant_white">白色</string>
+    <string name="color_variant_purple">紫色</string>
     <string name="color_monet">動態取色</string>
     <string name="floating_bottom_bar">懸浮底欄</string>
     <string name="floating_bottom_bar_summary">使用與 KernelSU 同款的液態玻璃懸浮底欄</string>
@@ -127,6 +125,24 @@
     <string name="pudding_gain_high">高增益</string>
     <string name="pudding_led_title">指示燈</string>
     <string name="pudding_led_summary">控制耳機指示燈開關</string>
+
+    <string name="control_prompt_tone_title">提示音</string>
+    <string name="control_prompt_tone_summary">切換模式時播放提示音</string>
+    <string name="control_prompt_volume_title">提示音音量</string>
+    <string name="control_prompt_volume_summary">調整提示音量（0–100）</string>
+    <string name="control_head_tracking_title">頭部追蹤</string>
+    <string name="control_head_tracking_summary">開啟空間音訊頭部追蹤</string>
+    <string name="control_lhdc_title">LHDC 編碼</string>
+    <string name="control_lhdc_summary">開啟高解析度 LHDC 編碼</string>
+    <string name="control_dual_connection_title">雙裝置連線</string>
+    <string name="control_dual_connection_summary">同時連線兩台裝置</string>
+
+    <string name="device_adaptation_title">裝置適配情況</string>
+    <string name="device_adaptation_summary">已適配機型與驗證狀態</string>
+    <string name="adaptation_verified">實機驗證</string>
+    <string name="adaptation_inferred">協定推斷（未實機驗證）</string>
+    <string name="adaptation_fallback_note">未配對的水月雨裝置將回退到保守的推測指令與內建預設素材。</string>
+
     <string name="pudding_anc_basic">基礎</string>
     <string name="pudding_anc_adaptive">自適應</string>
     <string name="pudding_anc_wind">抗風噪</string>

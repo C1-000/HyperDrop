@@ -25,4 +25,24 @@ interface DeviceProfile {
 
     /** Byte-level command vocabulary for this model's GAIA flavour. */
     val commandTable: GaiaCommandTable
+
+    // ---- Declarative metadata (data-driven model registry) ------------------------
+
+    /** Normalised Bluetooth-name tokens that identify this model. */
+    val aliases: List<String> get() = listOf(id)
+
+    /** True only for models verified on real hardware; false = protocol inferred. */
+    val verified: Boolean get() = false
+
+    /** Short provenance / caveat shown in the detail UI ("实机验证" vs "协议推断"). */
+    val note: String get() = ""
+
+    /** Stable key used to locate this model's built-in art (dev_{key}_{variant}_*). */
+    val imageKey: String get() = id
+
+    /** Built-in colour variants; the UI offers a picker when more than one is present. */
+    val colorVariants: List<ColorVariant> get() = listOf(ColorVariants.DEFAULT)
+
+    /** Transport capabilities recorded for this model. Only RFCOMM is implemented today. */
+    val transports: List<PodTransport> get() = listOf(PodTransport.RFCOMM_GAIA)
 }

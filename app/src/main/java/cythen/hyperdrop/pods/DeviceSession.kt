@@ -56,6 +56,11 @@ private val YIELD_BLOCKED_ACTIONS = setOf(
     OppoPodsAction.ACTION_TRANSPARENCY_VOCAL_ENHANCEMENT_SET,
     OppoPodsAction.ACTION_SPATIAL_AUDIO_SET,
     OppoPodsAction.ACTION_EQ_PRESET_SET,
+    OppoPodsAction.ACTION_PROMPT_TONE_SET,
+    OppoPodsAction.ACTION_PROMPT_VOLUME_SET,
+    OppoPodsAction.ACTION_HEAD_TRACKING_SET,
+    OppoPodsAction.ACTION_LHDC_SET,
+    OppoPodsAction.ACTION_DUAL_CONNECTION_SET,
 )
 
 @SuppressLint("MissingPermission", "StaticFieldLeak")
@@ -283,6 +288,24 @@ class DeviceSession {
             }
             OppoPodsAction.ACTION_LED_STATE_SET -> {
                 setLedEnabled(intent.getBooleanExtra("enabled", currentLedEnabled))
+            }
+            OppoPodsAction.ACTION_PROMPT_TONE_SET -> {
+                val enabled = intent.getBooleanExtra("enabled", false)
+                val volume = intent.getIntExtra("volume", 50)
+                val index = intent.getIntExtra("index", 0)
+                setPromptTone(enabled, volume, index)
+            }
+            OppoPodsAction.ACTION_PROMPT_VOLUME_SET -> {
+                setPromptVolume(intent.getIntExtra("volume", 50))
+            }
+            OppoPodsAction.ACTION_HEAD_TRACKING_SET -> {
+                setHeadTracking(intent.getBooleanExtra("enabled", false))
+            }
+            OppoPodsAction.ACTION_LHDC_SET -> {
+                setLhdc(intent.getBooleanExtra("enabled", false))
+            }
+            OppoPodsAction.ACTION_DUAL_CONNECTION_SET -> {
+                setDualConnection(intent.getBooleanExtra("enabled", false))
             }
             OppoPodsAction.ACTION_CYCLE_ANC -> {
                 cycleAnc()
@@ -548,6 +571,11 @@ class DeviceSession {
                 this.addAction(OppoPodsAction.ACTION_EQ_PRESET_SET)
                 this.addAction(OppoPodsAction.ACTION_GAIN_LEVEL_SET)
                 this.addAction(OppoPodsAction.ACTION_LED_STATE_SET)
+                this.addAction(OppoPodsAction.ACTION_PROMPT_TONE_SET)
+                this.addAction(OppoPodsAction.ACTION_PROMPT_VOLUME_SET)
+                this.addAction(OppoPodsAction.ACTION_HEAD_TRACKING_SET)
+                this.addAction(OppoPodsAction.ACTION_LHDC_SET)
+                this.addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_SET)
                 this.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                 this.addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
                 this.addAction(OppoPodsAction.ACTION_OFFICIAL_APP_PRESENCE)
@@ -902,6 +930,15 @@ class DeviceSession {
                 changeUILedState(currentLedEnabled)
                 Log.i(TAG, "LED enabled: $currentLedEnabled")
             }
+            is GaiaReport.SpatialAudio -> Log.i(TAG, "spatial audio: ${report.enabled}")
+            is GaiaReport.HeadTracking -> Log.i(TAG, "head tracking: ${report.enabled}")
+            is GaiaReport.VoiceConfig -> Log.i(
+                TAG,
+                "voice config: enabled=${report.enabled} volume=${report.volume} index=${report.index}",
+            )
+            is GaiaReport.Lhdc -> Log.i(TAG, "LHDC: ${report.enabled}")
+            is GaiaReport.DualConnection -> Log.i(TAG, "dual connection: ${report.enabled}")
+            is GaiaReport.SupportedFeatures -> Log.i(TAG, "supported features: ${report.features}")
             GaiaReport.GaiaNegotiation -> {
                 Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
             }
@@ -992,11 +1029,97 @@ class DeviceSession {
         sendPacketSafe(packet, "rfcomm debug send")
     }
 
-    fun setTransparencyVocalEnhancement(enabled: Boolean) { Log.d(TAG, "PUDDING: vocal enhancement unsupported; ignored=$enabled") }
+    fun setTransparencyVocalEnhancement(enabled: Boolean) {
+        val packet = commandTable().setTransparencyVocal(enabled) ?: run {
+            Log.d(TAG, "transparency vocal enhancement unsupported; ignored=$enabled")
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "transparency vocal")
+            commandTable().queryVoiceConfig?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "voice config query")
+            }
+        }
+    }
 
-    fun setSpatialAudioMode(mode: Int) { Log.d(TAG, "PUDDING: spatial audio unsupported; ignored=$mode") }
+    fun setSpatialAudioMode(mode: Int) {
+        val enabled = mode != 0
+        val packet = commandTable().setSpatialAudio(enabled) ?: run {
+            Log.d(TAG, "spatial audio unsupported; ignored=$mode")
+            return
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "spatial audio")
+            commandTable().querySpatialAudio?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "spatial audio query")
+            }
+        }
+    }
 
-    fun setEqPreset(presetId: Int) { Log.d(TAG, "PUDDING: OPPO EQ preset protocol removed; ignored=$presetId") }
+    /** Head tracking toggle (feature 0x18, sub 0x04). */
+    fun setHeadTracking(enabled: Boolean) {
+        val packet = commandTable().setHeadTracking(enabled) ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "head tracking")
+            commandTable().queryHeadTracking?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "head tracking query")
+            }
+        }
+    }
+
+    /** Voice prompt on/off with volume (0..100) and prompt index. */
+    fun setPromptTone(enabled: Boolean, volume: Int = 50, index: Int = 0) {
+        val packet = commandTable().setPromptTone(enabled, volume, index) ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "prompt tone")
+            commandTable().queryVoiceConfig?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "voice config query")
+            }
+        }
+    }
+
+    /** Prompt volume only; keeps the current enabled/index values as reported by the device. */
+    fun setPromptVolume(volume: Int) {
+        setPromptTone(true, volume.coerceIn(0, 100), 0)
+    }
+
+    /** LHDC codec toggle (feature 0x10). */
+    fun setLhdc(enabled: Boolean) {
+        val packet = commandTable().setLhdc(enabled) ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "LHDC")
+            commandTable().queryLhdc?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "LHDC query")
+            }
+        }
+    }
+
+    /** Dual-connection toggle (feature 0x14). */
+    fun setDualConnection(enabled: Boolean) {
+        val packet = commandTable().setDualConnection(enabled) ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "dual connection")
+            commandTable().queryDualConnection?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "dual connection query")
+            }
+        }
+    }
+
+    /** Ask the earbud for its supported-feature bitmask (feature 0x00). */
+    fun querySupportedFeatures() {
+        val query = commandTable().querySupportedFeatures ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(query), "supported features query")
+        }
+    }
+
+    fun setEqPreset(presetId: Int) { Log.d(TAG, "OPPO EQ preset protocol removed; ignored=$presetId") }
 
     fun setGainLevel(level: Int) {
         val packet = commandTable().setGainLevel(level) ?: return
@@ -1082,6 +1205,12 @@ class DeviceSession {
         sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
         delay(100)
         sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
+        delay(100)
+        commandTable().querySpatialAudio?.let { sendPacketSafe(GaiaTransport.v4(it), "spatial audio query") }
+        commandTable().queryHeadTracking?.let { sendPacketSafe(GaiaTransport.v4(it), "head tracking query") }
+        commandTable().queryVoiceConfig?.let { sendPacketSafe(GaiaTransport.v4(it), "voice config query") }
+        commandTable().queryLhdc?.let { sendPacketSafe(GaiaTransport.v4(it), "LHDC query") }
+        commandTable().queryDualConnection?.let { sendPacketSafe(GaiaTransport.v4(it), "dual connection query") }
         delay(100)
         sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))
         delay(80)

@@ -55,6 +55,7 @@ import cythen.hyperdrop.pods.WearState
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.ui.pages.AboutPage
+import cythen.hyperdrop.ui.pages.AdaptationStatusPage
 import cythen.hyperdrop.ui.pages.RfcommDebugPage
 import cythen.hyperdrop.ui.pages.ThemeSettingsPage
 import cythen.hyperdrop.utils.RootManager
@@ -83,6 +84,7 @@ sealed interface Screen : NavKey {
     data object About : Screen
     data object Theme : Screen
     data object RfcommDebug : Screen
+    data object DeviceAdaptation : Screen
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -113,6 +115,11 @@ fun MainUI(
     val transparencyVocalEnhancement = remember { mutableStateOf(false) }
     val gainLevel = remember { mutableStateOf(1) }
     val ledEnabled = remember { mutableStateOf(true) }
+    val promptToneEnabled = remember { mutableStateOf(false) }
+    val promptVolume = remember { mutableStateOf(50) }
+    val headTrackingEnabled = remember { mutableStateOf(false) }
+    val lhdcEnabled = remember { mutableStateOf(false) }
+    val dualConnectionEnabled = remember { mutableStateOf(false) }
     val tabs = remember { MainTab.entries.toList() }
     var selectedTab by remember { mutableStateOf(if (openSettings) MainTab.Settings else if (openDetail) MainTab.Earphones else MainTab.Module) }
     var hasAppliedDefaultTab by remember { mutableStateOf(openDetail || openSettings) }
@@ -497,6 +504,59 @@ fun MainUI(
         }
     }
 
+    fun setPromptTone(enabled: Boolean) {
+        promptToneEnabled.value = enabled
+        Intent(OppoPodsAction.ACTION_PROMPT_TONE_SET).apply {
+            putExtra("enabled", enabled)
+            putExtra("volume", promptVolume.value)
+            putExtra("index", 0)
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
+
+    fun setPromptVolume(volume: Int) {
+        val normalized = volume.coerceIn(0, 100)
+        promptVolume.value = normalized
+        Intent(OppoPodsAction.ACTION_PROMPT_VOLUME_SET).apply {
+            putExtra("volume", normalized)
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
+
+    fun setHeadTracking(enabled: Boolean) {
+        headTrackingEnabled.value = enabled
+        Intent(OppoPodsAction.ACTION_HEAD_TRACKING_SET).apply {
+            putExtra("enabled", enabled)
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
+
+    fun setLhdc(enabled: Boolean) {
+        lhdcEnabled.value = enabled
+        Intent(OppoPodsAction.ACTION_LHDC_SET).apply {
+            putExtra("enabled", enabled)
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
+
+    fun setDualConnection(enabled: Boolean) {
+        dualConnectionEnabled.value = enabled
+        Intent(OppoPodsAction.ACTION_DUAL_CONNECTION_SET).apply {
+            putExtra("enabled", enabled)
+            setPackage("com.android.bluetooth")
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            context.sendBroadcast(this)
+        }
+    }
+
     fun onDeviceDisconnect(device: BluetoothDevice) {
         connectingDeviceAddress = null
         pendingOpenEarphonesAfterPickerLoaded = false
@@ -565,8 +625,8 @@ fun MainUI(
         earphonePrefs.value = PodImagePrefs.saveImages(context, prefs, xposedService, address, name, images, clearedImages)
     }
 
-    fun savePodImageBytes(address: String, name: String, images: Map<PodImageResource, ByteArray>) {
-        earphonePrefs.value = PodImagePrefs.saveImageBytes(context, prefs, xposedService, address, name, images)
+    fun saveColorVariant(address: String, name: String, key: String) {
+        earphonePrefs.value = PodImagePrefs.saveColorVariant(prefs, xposedService, address, name, key)
     }
 
     fun restartScopes(packages: List<String>) {
@@ -624,6 +684,17 @@ fun MainUI(
                 onGainLevelChange = { setGainLevel(it) },
                 ledEnabled = ledEnabled,
                 onLedEnabledChange = { setLedEnabled(it) },
+                promptToneEnabled = promptToneEnabled,
+                onPromptToneChange = { setPromptTone(it) },
+                promptVolume = promptVolume,
+                onPromptVolumeChange = { setPromptVolume(it) },
+                headTrackingEnabled = headTrackingEnabled,
+                onHeadTrackingChange = { setHeadTracking(it) },
+                lhdcEnabled = lhdcEnabled,
+                onLhdcChange = { setLhdc(it) },
+                dualConnectionEnabled = dualConnectionEnabled,
+                onDualConnectionChange = { setDualConnection(it) },
+                capabilities = displayCapabilities,
                 spatialAudioSupported = displayCapabilities.spatialAudioSupported,
                 spatialSoundSupported = displayCapabilities.spatialSoundSwitchSupported,
                 ancModes = displayCapabilities.ancModes,
@@ -698,6 +769,7 @@ fun MainUI(
                 },
                 onOpenTheme = { backStack.add(Screen.Theme) },
                 onOpenAbout = { backStack.add(Screen.About) },
+                onOpenDeviceAdaptation = { backStack.add(Screen.DeviceAdaptation) },
                 showRestartScopeDialog = showRestartScopeDialog,
                 restartingScopes = restartingScopes,
                 onShowRestartScopeDialog = { showRestartScopeDialog = true },
@@ -708,7 +780,9 @@ fun MainUI(
                 onSavePodImages = { address, name, images, clearedImages ->
                     savePodImages(address, name, images, clearedImages)
                 },
-                onSavePodImageBytes = { address, name, images -> savePodImageBytes(address, name, images) },
+                onSaveColorVariant = { address, name, key ->
+                    saveColorVariant(address, name, key)
+                },
             )
         }
         entry<Screen.About> {
@@ -814,6 +888,38 @@ fun MainUI(
                         modifier = Modifier.nestedScroll(rfcommScrollBehavior.nestedScrollConnection),
                         contentPadding = PaddingValues(0.dp),
                         clearRequest = clearRfcommLogsRequest,
+                    )
+                }
+            }
+        }
+        entry<Screen.DeviceAdaptation> {
+            val adaptationScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = stringResource(R.string.device_adaptation_title),
+                        largeTitle = stringResource(R.string.device_adaptation_title),
+                        scrollBehavior = adaptationScrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = { backStack.removeLast() }) {
+                                Icon(imageVector = MiuixIcons.Back, contentDescription = "Back")
+                            }
+                        }
+                    )
+                }
+            ) { padding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(backgroundColor)
+                        .padding(padding),
+                ) {
+                    AdaptationStatusPage(
+                        modifier = Modifier
+                            .overScrollVertical()
+                            .nestedScroll(adaptationScrollBehavior.nestedScrollConnection),
+                        contentPadding = PaddingValues(bottom = pageBottomContentPadding),
                     )
                 }
             }

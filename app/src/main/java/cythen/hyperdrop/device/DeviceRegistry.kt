@@ -6,30 +6,28 @@ import cythen.hyperdrop.pods.AncImplementation
 /**
  * Single source of truth for "which device is this, and what can it do".
  *
- * Matching is exact-model-first: the first registered profile whose [DeviceProfile.matches]
- * accepts the Bluetooth name wins. Anything else falls back to [StandardBluetoothProfile],
- * which claims no capabilities — an unknown device never silently gets PUDDING controls.
+ * Matching is data-driven via [DeviceModels]: the longest alias that is a substring of the
+ * Bluetooth name wins; a MOONDROP-branded name that matches no model falls back to a
+ * conservative inferred profile; anything else falls back to [StandardBluetoothProfile],
+ * which claims no capabilities.
  *
- * Adding a MOONDROP model = one new [DeviceProfile] + one line in [registeredProfiles].
+ * Adding a MOONDROP model = one entry in [DeviceModels.models]. No change needed in
+ * pods/, hook/ or ui/.
  */
 object DeviceRegistry {
 
-    /**
-     * Registered real models. Order matters only if two profiles could match the same name.
-     */
-    val registeredProfiles: List<DeviceProfile> = listOf(
-        PuddingProfile,
-    )
+    /** Registered real models (verified + protocol-inferred). */
+    val registeredProfiles: List<DeviceProfile> = DeviceModels.models
 
-    /** Conservative fallback; never matched directly, only returned by [profileFor]. */
+    /** Conservative fallback for a non-MOONDROP device. */
     val fallbackProfile: DeviceProfile = StandardBluetoothProfile
 
     fun profileFor(name: String?): DeviceProfile =
-        registeredProfiles.firstOrNull { it.matches(name) } ?: fallbackProfile
+        DeviceModels.match(name) ?: fallbackProfile
 
-    /** True when a concrete (non-fallback) profile owns this name. */
+    /** True when a concrete model (verified or inferred MOONDROP) owns this name. */
     fun isSupported(name: String?): Boolean =
-        name != null && registeredProfiles.any { it.matches(name) }
+        name != null && DeviceModels.match(name) != null
 
     /** Lookup by stable id, for IPC payloads that carry a device id (phase F). */
     fun profileById(id: String): DeviceProfile =
@@ -38,9 +36,6 @@ object DeviceRegistry {
     /**
      * Capabilities for [deviceName] with per-feature user overrides applied on top of the
      * profile's auto-detected values.
-     *
-     * The signature intentionally mirrors the previous capability-detection entry point so
-     * the existing call sites only need a `DeviceRegistry.` qualifier.
      */
     fun detectDeviceCapabilities(
         deviceName: String,

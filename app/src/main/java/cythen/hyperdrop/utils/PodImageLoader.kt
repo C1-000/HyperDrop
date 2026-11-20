@@ -5,9 +5,12 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import cythen.hyperdrop.R
+import cythen.hyperdrop.config.DeviceImageCatalog
+import cythen.hyperdrop.config.DeviceImageSet
 import cythen.hyperdrop.config.PodImagePrefs
 import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.config.imageUri
+import cythen.hyperdrop.device.DeviceModels
 
 object PodImageLoader {
     private const val MODULE_PACKAGE = "cythen.hyperdrop"
@@ -31,7 +34,28 @@ object PodImageLoader {
         val moduleContext = runCatching {
             context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
         }.getOrNull() ?: return null
-        return BitmapFactory.decodeResource(moduleContext.resources, fallbackResId)
+        return BitmapFactory.decodeResource(moduleContext.resources, resolveFallbackRes(prefs, address, resource, fallbackResId))
+    }
+
+    /**
+     * Pick the built-in drawable for a device+colourway. Custom images (handled above)
+     * always win; this only resolves the bundled fallback art.
+     */
+    private fun resolveFallbackRes(
+        prefs: SharedPreferences,
+        address: String,
+        resource: PodImageResource,
+        genericResId: Int,
+    ): Int {
+        val earphone = runCatching { PodImagePrefs.findOrLatest(prefs, address) }.getOrNull()
+        if (earphone == null) return genericResId
+        val profile = DeviceModels.match(earphone.name) ?: return genericResId
+        val art: DeviceImageSet = DeviceImageCatalog.resolve(profile.imageKey, earphone.colorVariant)
+        return when (resource) {
+            PodImageResource.BOX -> art.box
+            PodImageResource.LEFT -> art.left
+            PodImageResource.RIGHT -> art.right
+        }
     }
 
     fun loadBitmapWithCustomFallback(
@@ -55,7 +79,10 @@ object PodImageLoader {
         val moduleContext = runCatching {
             context.createPackageContext(MODULE_PACKAGE, Context.CONTEXT_IGNORE_SECURITY)
         }.getOrNull() ?: return null
-        return BitmapFactory.decodeResource(moduleContext.resources, fallbackResId)
+        return BitmapFactory.decodeResource(
+            moduleContext.resources,
+            resolveFallbackRes(prefs, address, resource, fallbackResId),
+        )
     }
 
     fun loadBoxBitmap(context: Context, prefs: SharedPreferences, address: String): Bitmap? {

@@ -15,6 +15,9 @@ import android.os.Looper
 import com.xzakota.hyper.notification.focus.FocusNotification
 import cythen.hyperdrop.BuildConfig
 import cythen.hyperdrop.R
+import cythen.hyperdrop.config.DeviceImageCatalog
+import cythen.hyperdrop.config.PodImagePrefs
+import cythen.hyperdrop.device.DeviceModels
 import cythen.hyperdrop.hook.Log
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 
@@ -65,8 +68,13 @@ object FocusIslandUtil {
                 return false
             }
 
-            val leftBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_left)
-            val rightBitmap = BitmapFactory.decodeResource(moduleContext.resources, R.drawable.img_right)
+            val earphone = runCatching { PodImagePrefs.findOrLatest(prefs, address) }.getOrNull()
+            val variantKey = earphone?.colorVariant
+            val profile = earphone?.name?.let { DeviceModels.match(it) }
+            val art = profile?.let { DeviceImageCatalog.resolve(it.imageKey, variantKey) }
+                ?: DeviceImageCatalog.DEFAULT
+            val leftBitmap = BitmapFactory.decodeResource(moduleContext.resources, art.left)
+            val rightBitmap = BitmapFactory.decodeResource(moduleContext.resources, art.right)
             if (leftBitmap == null || rightBitmap == null) {
                 android.util.Log.e(TAG, "decode island icons failed left=$leftBitmap right=$rightBitmap")
                 return false

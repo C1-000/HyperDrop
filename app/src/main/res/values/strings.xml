@@ -62,12 +62,6 @@
     <string name="custom_image_selected">Custom image selected</string>
     <string name="custom_image_default">Use default image</string>
     <string name="custom_image_restore_default">Restore default image</string>
-    <string name="import_melody_images">Import Images</string>
-    <string name="import_melody_images_summary">Import model images from HeyTap Headset</string>
-    <string name="import_melody_images_hint">Please connect the earphones once in HeyTap Headset first.</string>
-    <string name="import_melody_images_empty">No HeyTap Headset model images found.</string>
-    <string name="import_melody_images_root_required">Please check ROOT permission.</string>
-    <string name="import_melody_images_action">Import All</string>
     <string name="theme_title">Theme</string>
     <string name="theme_follow_system">Follow System</string>
     <string name="theme_light">Light</string>
@@ -75,6 +69,10 @@
     <string name="theme_color">Theme Color</string>
     <string name="theme_color_summary">Choose the app accent color style</string>
     <string name="color_default">Default</string>
+    <string name="color_variant_title">Device colour</string>
+    <string name="color_variant_black">Black</string>
+    <string name="color_variant_white">White</string>
+    <string name="color_variant_purple">Purple</string>
     <string name="color_monet">Dynamic Color</string>
     <string name="floating_bottom_bar">Floating Bottom Bar</string>
     <string name="floating_bottom_bar_summary">Use the KernelSU-style liquid glass floating navigation bar</string>
@@ -127,6 +125,23 @@
     <string name="pudding_gain_high">High gain</string>
     <string name="pudding_led_title">Indicator light</string>
     <string name="pudding_led_summary">Turn the earphone indicator light on or off</string>
+
+    <string name="control_prompt_tone_title">Prompt tone</string>
+    <string name="control_prompt_tone_summary">Play a tone when switching modes</string>
+    <string name="control_prompt_volume_title">Prompt volume</string>
+    <string name="control_prompt_volume_summary">Adjust the prompt tone volume (0–100)</string>
+    <string name="control_head_tracking_title">Head tracking</string>
+    <string name="control_head_tracking_summary">Enable spatial head tracking</string>
+    <string name="control_lhdc_title">LHDC codec</string>
+    <string name="control_lhdc_summary">Enable the high-resolution LHDC codec</string>
+    <string name="control_dual_connection_title">Dual-device connection</string>
+    <string name="control_dual_connection_summary">Connect to two devices at once</string>
+
+    <string name="device_adaptation_title">Device adaptation</string>
+    <string name="device_adaptation_summary">Supported models and verification status</string>
+    <string name="adaptation_verified">Verified on real hardware</string>
+    <string name="adaptation_inferred">Protocol inferred (not verified)</string>
+    <string name="adaptation_fallback_note">Unmatched MOONDROP devices fall back to conservative guessed constants and bundled default artwork.</string>
 
     <string name="pudding_anc_basic">Basic</string>
     <string name="pudding_anc_adaptive">Adaptive</string>

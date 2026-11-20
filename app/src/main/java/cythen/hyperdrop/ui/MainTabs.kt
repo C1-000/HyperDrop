@@ -31,14 +31,17 @@ import androidx.compose.ui.zIndex
 import io.github.libxposed.service.XposedService
 import cythen.hyperdrop.R
 import cythen.hyperdrop.device.AncModeOption
+import cythen.hyperdrop.device.ColorVariant
+import cythen.hyperdrop.device.DeviceCapabilities
+import cythen.hyperdrop.device.DeviceModels
 import cythen.hyperdrop.config.EarphonePref
 import cythen.hyperdrop.config.PodImageResource
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.dialogs.RestartScope
 import cythen.hyperdrop.ui.dialogs.RestartScopeDialog
-import cythen.hyperdrop.ui.dialogs.MelodyImageImportDialog
 import cythen.hyperdrop.ui.dialogs.PodImageConfigDialog
+import cythen.hyperdrop.ui.dialogs.ColorVariantDialog
 import cythen.hyperdrop.ui.pages.EarphonesTabPage
 import cythen.hyperdrop.ui.pages.HomePage
 import cythen.hyperdrop.ui.pages.SettingsPage
@@ -54,10 +57,10 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Edit
-import top.yukonga.miuix.kmp.icon.extended.Import
 import top.yukonga.miuix.kmp.icon.extended.Months
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Theme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
@@ -94,6 +97,17 @@ internal fun MainTabsScaffold(
     onGainLevelChange: (Int) -> Unit,
     ledEnabled: MutableState<Boolean>,
     onLedEnabledChange: (Boolean) -> Unit,
+    promptToneEnabled: MutableState<Boolean>,
+    onPromptToneChange: (Boolean) -> Unit,
+    promptVolume: MutableState<Int>,
+    onPromptVolumeChange: (Int) -> Unit,
+    headTrackingEnabled: MutableState<Boolean>,
+    onHeadTrackingChange: (Boolean) -> Unit,
+    lhdcEnabled: MutableState<Boolean>,
+    onLhdcChange: (Boolean) -> Unit,
+    dualConnectionEnabled: MutableState<Boolean>,
+    onDualConnectionChange: (Boolean) -> Unit,
+    capabilities: DeviceCapabilities,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
@@ -134,7 +148,8 @@ internal fun MainTabsScaffold(
     onBackToDevicePicker: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
     onSavePodImages: (String, String, Map<PodImageResource, Uri?>, Set<PodImageResource>) -> Unit,
-    onSavePodImageBytes: (String, String, Map<PodImageResource, ByteArray>) -> Unit,
+    onSaveColorVariant: (String, String, String) -> Unit,
+    onOpenDeviceAdaptation: () -> Unit,
 ) {
     val pagerState = rememberPagerState(
         initialPage = selectedTab.ordinal,
@@ -150,8 +165,10 @@ internal fun MainTabsScaffold(
     val currentEarphonePref = earphonePrefs.firstOrNull {
         it.address.equals(connectedDeviceAddress, ignoreCase = true)
     }
+    val currentProfile = DeviceModels.match(displayTitle)
+    val colorVariants: List<ColorVariant> = currentProfile?.colorVariants.orEmpty()
     var showPodImageDialog by remember { mutableStateOf(false) }
-    var showMelodyImportDialog by remember { mutableStateOf(false) }
+    var showColorVariantDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedTab) {
         val targetPage = selectedTab.ordinal
@@ -236,10 +253,24 @@ internal fun MainTabsScaffold(
                         onGainLevelChange = onGainLevelChange,
                         ledEnabled = ledEnabled,
                         onLedEnabledChange = onLedEnabledChange,
+                        promptToneEnabled = promptToneEnabled,
+                        onPromptToneChange = onPromptToneChange,
+                        promptVolume = promptVolume,
+                        onPromptVolumeChange = onPromptVolumeChange,
+                        headTrackingEnabled = headTrackingEnabled,
+                        onHeadTrackingChange = onHeadTrackingChange,
+                        lhdcEnabled = lhdcEnabled,
+                        onLhdcChange = onLhdcChange,
+                        dualConnectionEnabled = dualConnectionEnabled,
+                        onDualConnectionChange = onDualConnectionChange,
+                        capabilities = capabilities,
                         spatialAudioSupported = spatialAudioSupported,
                         spatialSoundSupported = spatialSoundSupported,
                         ancModes = ancModes,
                         boxImagePath = currentEarphonePref?.boxImagePath,
+                        deviceImageKey = currentProfile?.imageKey,
+                        colorVariantKey = currentEarphonePref?.colorVariant,
+                        onOpenColorVariant = { showColorVariantDialog = true },
                         connectedDeviceAddress = connectedDeviceAddress,
                         connectingDeviceAddress = connectingDeviceAddress,
                         showConnectErrorDialog = showConnectErrorDialog,
@@ -249,7 +280,6 @@ internal fun MainTabsScaffold(
                         onDeviceDisconnect = onDeviceDisconnect,
                         onDismissConnectError = onDismissConnectError,
                         onBackToDevicePicker = onBackToDevicePicker,
-                        onOpenMelodyImport = { showMelodyImportDialog = true },
                         onOpenPodImageConfig = { showPodImageDialog = true },
                         onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                     )
@@ -276,6 +306,7 @@ internal fun MainTabsScaffold(
                         onFakeDeviceIdChange = onFakeDeviceIdChange,
                         onOpenTheme = onOpenTheme,
                         onOpenAbout = onOpenAbout,
+                        onOpenDeviceAdaptation = onOpenDeviceAdaptation,
                     )
                 }
             }
@@ -283,8 +314,8 @@ internal fun MainTabsScaffold(
             if (isLandscapeDetail) {
                 LandscapeDetailActions(
                     onBackToDevicePicker = onBackToDevicePicker,
-                    onOpenMelodyImport = { showMelodyImportDialog = true },
                     onOpenPodImageConfig = { showPodImageDialog = true },
+                    onOpenColorVariant = { showColorVariantDialog = true },
                     onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                 )
             }
@@ -309,16 +340,15 @@ internal fun MainTabsScaffold(
             },
         )
 
-        MelodyImageImportDialog(
-            show = showMelodyImportDialog,
-            currentAddress = connectedDeviceAddress,
-            currentName = displayTitle,
-            onDismissRequest = { showMelodyImportDialog = false },
-            onImport = { address, name, images ->
-                onSavePodImageBytes(address, name, images)
-                showMelodyImportDialog = false
-            },
+        ColorVariantDialog(
+            show = showColorVariantDialog && colorVariants.size > 1,
+            deviceName = displayTitle,
+            variants = colorVariants,
+            selectedKey = currentEarphonePref?.colorVariant,
+            onDismissRequest = { showColorVariantDialog = false },
+            onSelected = { key -> onSaveColorVariant(connectedDeviceAddress, displayTitle, key) },
         )
+
         }
 
         if (floatingBottomBar && backdrop != null) {
@@ -409,10 +439,23 @@ private fun EarphonesTabShell(
     onGainLevelChange: (Int) -> Unit,
     ledEnabled: MutableState<Boolean>,
     onLedEnabledChange: (Boolean) -> Unit,
+    promptToneEnabled: MutableState<Boolean>,
+    onPromptToneChange: (Boolean) -> Unit,
+    promptVolume: MutableState<Int>,
+    onPromptVolumeChange: (Int) -> Unit,
+    headTrackingEnabled: MutableState<Boolean>,
+    onHeadTrackingChange: (Boolean) -> Unit,
+    lhdcEnabled: MutableState<Boolean>,
+    onLhdcChange: (Boolean) -> Unit,
+    dualConnectionEnabled: MutableState<Boolean>,
+    onDualConnectionChange: (Boolean) -> Unit,
+    capabilities: DeviceCapabilities,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
     boxImagePath: String?,
+    deviceImageKey: String?,
+    colorVariantKey: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
     showConnectErrorDialog: Boolean,
@@ -422,8 +465,8 @@ private fun EarphonesTabShell(
     onDeviceDisconnect: (BluetoothDevice) -> Unit,
     onDismissConnectError: () -> Unit,
     onBackToDevicePicker: () -> Unit,
-    onOpenMelodyImport: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
+    onOpenColorVariant: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
@@ -444,8 +487,8 @@ private fun EarphonesTabShell(
                     actions = {
                         if (showEarphoneDetail) {
                             EarphoneDetailActions(
-                                onOpenMelodyImport = onOpenMelodyImport,
                                 onOpenPodImageConfig = onOpenPodImageConfig,
+                                onOpenColorVariant = onOpenColorVariant,
                                 onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                             )
                         }
@@ -472,10 +515,23 @@ private fun EarphonesTabShell(
             onGainLevelChange = onGainLevelChange,
             ledEnabled = ledEnabled.value,
             onLedEnabledChange = onLedEnabledChange,
+            promptToneEnabled = promptToneEnabled.value,
+            onPromptToneChange = onPromptToneChange,
+            promptVolume = promptVolume.value,
+            onPromptVolumeChange = onPromptVolumeChange,
+            headTrackingEnabled = headTrackingEnabled.value,
+            onHeadTrackingChange = onHeadTrackingChange,
+            lhdcEnabled = lhdcEnabled.value,
+            onLhdcChange = onLhdcChange,
+            dualConnectionEnabled = dualConnectionEnabled.value,
+            onDualConnectionChange = onDualConnectionChange,
+            capabilities = capabilities,
             spatialAudioSupported = spatialAudioSupported,
             spatialSoundSupported = spatialSoundSupported,
             ancModes = ancModes,
             boxImagePath = boxImagePath,
+            deviceImageKey = deviceImageKey,
+            colorVariantKey = colorVariantKey,
             connectedDeviceAddress = connectedDeviceAddress,
             connectingDeviceAddress = connectingDeviceAddress,
             showConnectErrorDialog = showConnectErrorDialog,
@@ -513,6 +569,7 @@ private fun SettingsTabPage(
     onFakeDeviceIdChange: (String) -> Unit,
     onOpenTheme: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenDeviceAdaptation: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
     Scaffold(
@@ -552,6 +609,7 @@ private fun SettingsTabPage(
             onFakeDeviceIdChange = onFakeDeviceIdChange,
             onOpenTheme = onOpenTheme,
             onOpenAbout = onOpenAbout,
+            onOpenDeviceAdaptation = onOpenDeviceAdaptation,
         )
     }
 }
@@ -559,8 +617,8 @@ private fun SettingsTabPage(
 @Composable
 private fun LandscapeDetailActions(
     onBackToDevicePicker: () -> Unit,
-    onOpenMelodyImport: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
+    onOpenColorVariant: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     IconButton(
@@ -577,11 +635,11 @@ private fun LandscapeDetailActions(
                 .align(Alignment.TopEnd)
                 .padding(top = 8.dp, end = 104.dp)
                 .zIndex(1f),
-            onClick = onOpenMelodyImport,
+            onClick = onOpenColorVariant,
         ) {
             Icon(
-                imageVector = MiuixIcons.Import,
-                contentDescription = stringResource(R.string.import_melody_images),
+                imageVector = MiuixIcons.Theme,
+                contentDescription = stringResource(R.string.color_variant_title),
             )
         }
         IconButton(
@@ -613,14 +671,15 @@ private fun LandscapeDetailActions(
 
 @Composable
 private fun EarphoneDetailActions(
-    onOpenMelodyImport: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
+    onOpenColorVariant: () -> Unit,
     onOpenSystemHeadsetSettings: () -> Unit,
 ) {
-    IconButton(onClick = onOpenMelodyImport) {
+    IconButton(onClick = onOpenColorVariant) {
         Icon(
-            imageVector = MiuixIcons.Import,
-            contentDescription = stringResource(R.string.import_melody_images),
+            imageVector = MiuixIcons.Theme,
+            modifier = Modifier.size(23.dp),
+            contentDescription = stringResource(R.string.color_variant_title),
         )
     }
     IconButton(onClick = onOpenPodImageConfig) {

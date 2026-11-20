@@ -218,6 +218,7 @@ class DeviceDetailActivity : ComponentActivity() {
                                     putExtra("enabled", enabled)
                                 }
                             },
+                            capabilities = capabilities,
                             showAppSettingsEntry = true,
                             onOpenAppSettings = {
                                 startActivity(Intent(context, MainActivity::class.java).apply {

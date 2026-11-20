@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import cythen.hyperdrop.R
 import cythen.hyperdrop.device.AncModeOption
+import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.config.ConfigManager
+import cythen.hyperdrop.config.DeviceImageCatalog
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.components.AncSwitch
@@ -41,6 +43,7 @@ import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Text
 import cythen.hyperdrop.pods.EqPreset
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 @Composable
@@ -67,7 +70,20 @@ fun PodDetailPage(
     onGainLevelChange: (Int) -> Unit = {},
     ledEnabled: Boolean = true,
     onLedEnabledChange: (Boolean) -> Unit = {},
+    promptToneEnabled: Boolean = false,
+    onPromptToneChange: (Boolean) -> Unit = {},
+    promptVolume: Int = 50,
+    onPromptVolumeChange: (Int) -> Unit = {},
+    headTrackingEnabled: Boolean = false,
+    onHeadTrackingChange: (Boolean) -> Unit = {},
+    lhdcEnabled: Boolean = false,
+    onLhdcChange: (Boolean) -> Unit = {},
+    dualConnectionEnabled: Boolean = false,
+    onDualConnectionChange: (Boolean) -> Unit = {},
+    capabilities: DeviceCapabilities = DeviceCapabilities.NONE,
     boxImagePath: String? = null,
+    deviceImageKey: String? = null,
+    colorVariantKey: String? = null,
     showAppSettingsEntry: Boolean = false,
     onOpenAppSettings: () -> Unit = {},
     showSystemSettingsEntry: Boolean = false,
@@ -75,6 +91,8 @@ fun PodDetailPage(
     controlsEnabled: Boolean = true,
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey, colorVariantKey).box
+    val imagePainter = rememberPodImagePainter(boxImagePath, builtinBoxRes)
 
     if (isLandscape) {
         Row(
@@ -91,7 +109,7 @@ fun PodDetailPage(
                 verticalArrangement = Arrangement.Center
             ) {
                 Image(
-                    painter = rememberPodImagePainter(boxImagePath),
+                    painter = imagePainter,
                     contentDescription = "Earphones",
                     modifier = Modifier
                         .fillMaxWidth(0.82f)
@@ -133,6 +151,17 @@ fun PodDetailPage(
                     onGainLevelChange = onGainLevelChange,
                     ledEnabled = ledEnabled,
                     onLedEnabledChange = onLedEnabledChange,
+                    promptToneEnabled = promptToneEnabled,
+                    onPromptToneChange = onPromptToneChange,
+                    promptVolume = promptVolume,
+                    onPromptVolumeChange = onPromptVolumeChange,
+                    headTrackingEnabled = headTrackingEnabled,
+                    onHeadTrackingChange = onHeadTrackingChange,
+                    lhdcEnabled = lhdcEnabled,
+                    onLhdcChange = onLhdcChange,
+                    dualConnectionEnabled = dualConnectionEnabled,
+                    onDualConnectionChange = onDualConnectionChange,
+                    capabilities = capabilities,
                     showAppSettingsEntry = showAppSettingsEntry,
                     onOpenAppSettings = onOpenAppSettings,
                     showSystemSettingsEntry = showSystemSettingsEntry,
@@ -152,7 +181,7 @@ fun PodDetailPage(
     ) {
         item {
             Image(
-                painter = rememberPodImagePainter(boxImagePath),
+                painter = imagePainter,
                 contentDescription = "Earphones",
                 modifier = Modifier
                     .fillMaxWidth(0.7f)
@@ -180,6 +209,17 @@ fun PodDetailPage(
             onGainLevelChange = onGainLevelChange,
             ledEnabled = ledEnabled,
             onLedEnabledChange = onLedEnabledChange,
+            promptToneEnabled = promptToneEnabled,
+            onPromptToneChange = onPromptToneChange,
+            promptVolume = promptVolume,
+            onPromptVolumeChange = onPromptVolumeChange,
+            headTrackingEnabled = headTrackingEnabled,
+            onHeadTrackingChange = onHeadTrackingChange,
+            lhdcEnabled = lhdcEnabled,
+            onLhdcChange = onLhdcChange,
+            dualConnectionEnabled = dualConnectionEnabled,
+            onDualConnectionChange = onDualConnectionChange,
+            capabilities = capabilities,
             showAppSettingsEntry = showAppSettingsEntry,
             onOpenAppSettings = onOpenAppSettings,
             showSystemSettingsEntry = showSystemSettingsEntry,
@@ -196,13 +236,13 @@ fun PodDetailPage(
  * transparent MOONDROP PUDDING image (R.drawable.img_box).
  */
 @Composable
-private fun rememberPodImagePainter(path: String?) = remember(path) {
+private fun rememberPodImagePainter(path: String?, builtinResId: Int) = remember(path, builtinResId) {
     path?.let {
         runCatching { BitmapFactory.decodeFile(it) }
             .getOrNull()
             ?.let { bitmap -> BitmapPainter(bitmap.asImageBitmap()) }
     }
-} ?: painterResource(R.drawable.img_box)
+} ?: painterResource(builtinResId)
 
 private fun LazyListScope.podControlItems(
     batteryParams: BatteryParams,
@@ -223,6 +263,17 @@ private fun LazyListScope.podControlItems(
     onGainLevelChange: (Int) -> Unit,
     ledEnabled: Boolean,
     onLedEnabledChange: (Boolean) -> Unit,
+    promptToneEnabled: Boolean,
+    onPromptToneChange: (Boolean) -> Unit,
+    promptVolume: Int,
+    onPromptVolumeChange: (Int) -> Unit,
+    headTrackingEnabled: Boolean,
+    onHeadTrackingChange: (Boolean) -> Unit,
+    lhdcEnabled: Boolean,
+    onLhdcChange: (Boolean) -> Unit,
+    dualConnectionEnabled: Boolean,
+    onDualConnectionChange: (Boolean) -> Unit,
+    capabilities: DeviceCapabilities,
     showAppSettingsEntry: Boolean,
     onOpenAppSettings: () -> Unit,
     showSystemSettingsEntry: Boolean,
@@ -264,28 +315,110 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    item {
-        val gainOptions = listOf(
-            stringResource(R.string.pudding_gain_low),
-            stringResource(R.string.pudding_gain_medium),
-            stringResource(R.string.pudding_gain_high),
-        )
-        Card(
-            modifier = Modifier.padding(horizontal = 12.dp)
-        ) {
-            OverlayDropdownPreference(
-                title = stringResource(R.string.pudding_gain_title),
-                summary = stringResource(R.string.pudding_gain_summary),
-                items = gainOptions,
-                selectedIndex = gainLevel.coerceIn(0, 2),
-                onSelectedIndexChange = { onGainLevelChange(it.coerceIn(0, 2)) }
-            )
-            SwitchPreference(
-                title = stringResource(R.string.pudding_led_title),
-                summary = stringResource(R.string.pudding_led_summary),
-                checked = ledEnabled,
-                onCheckedChange = onLedEnabledChange
-            )
+    // 1. Gain — shown only when the device profile declares gain control.
+    if (capabilities.gainSupported) {
+        item {
+            val gainOptions = capabilities.gainLabels.ifEmpty {
+                listOf(
+                    stringResource(R.string.pudding_gain_low),
+                    stringResource(R.string.pudding_gain_medium),
+                    stringResource(R.string.pudding_gain_high),
+                )
+            }
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                OverlayDropdownPreference(
+                    title = stringResource(R.string.pudding_gain_title),
+                    summary = stringResource(R.string.pudding_gain_summary),
+                    items = gainOptions,
+                    selectedIndex = gainLevel.coerceIn(0, gainOptions.size - 1),
+                    onSelectedIndexChange = { onGainLevelChange(it.coerceIn(0, gainOptions.size - 1)) }
+                )
+            }
+        }
+    }
+
+    // 2. LED indicator.
+    if (capabilities.ledSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.pudding_led_title),
+                    summary = stringResource(R.string.pudding_led_summary),
+                    checked = ledEnabled,
+                    onCheckedChange = onLedEnabledChange
+                )
+            }
+        }
+    }
+
+    // 3. Prompt tone on/off.
+    if (capabilities.promptToneSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_prompt_tone_title),
+                    summary = stringResource(R.string.control_prompt_tone_summary),
+                    checked = promptToneEnabled,
+                    onCheckedChange = onPromptToneChange
+                )
+            }
+        }
+    }
+
+    // 4. Prompt tone volume (0..100).
+    if (capabilities.promptVolumeSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SliderPreference(
+                    value = promptVolume.coerceIn(0, 100).toFloat(),
+                    onValueChange = { onPromptVolumeChange(it.toInt().coerceIn(0, 100)) },
+                    title = stringResource(R.string.control_prompt_volume_title),
+                    summary = stringResource(R.string.control_prompt_volume_summary),
+                    valueRange = 0f..100f,
+                )
+            }
+        }
+    }
+
+    // 5. Head tracking.
+    if (capabilities.headTrackingSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_head_tracking_title),
+                    summary = stringResource(R.string.control_head_tracking_summary),
+                    checked = headTrackingEnabled,
+                    onCheckedChange = onHeadTrackingChange
+                )
+            }
+        }
+    }
+
+    // 6. LHDC codec.
+    if (capabilities.lhdcSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_lhdc_title),
+                    summary = stringResource(R.string.control_lhdc_summary),
+                    checked = lhdcEnabled,
+                    onCheckedChange = onLhdcChange
+                )
+            }
+        }
+    }
+
+    // 7. Dual-device connection.
+    if (capabilities.dualConnectionSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_dual_connection_title),
+                    summary = stringResource(R.string.control_dual_connection_summary),
+                    checked = dualConnectionEnabled,
+                    onCheckedChange = onDualConnectionChange
+                )
+            }
         }
     }
 

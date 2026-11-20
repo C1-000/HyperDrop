@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import cythen.hyperdrop.R
 import cythen.hyperdrop.device.AncModeOption
+import cythen.hyperdrop.device.DeviceCapabilities
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -36,10 +37,23 @@ internal fun EarphonesTabPage(
     onGainLevelChange: (Int) -> Unit,
     ledEnabled: Boolean,
     onLedEnabledChange: (Boolean) -> Unit,
+    promptToneEnabled: Boolean,
+    onPromptToneChange: (Boolean) -> Unit,
+    promptVolume: Int,
+    onPromptVolumeChange: (Int) -> Unit,
+    headTrackingEnabled: Boolean,
+    onHeadTrackingChange: (Boolean) -> Unit,
+    lhdcEnabled: Boolean,
+    onLhdcChange: (Boolean) -> Unit,
+    dualConnectionEnabled: Boolean,
+    onDualConnectionChange: (Boolean) -> Unit,
+    capabilities: DeviceCapabilities,
     spatialAudioSupported: Boolean,
     spatialSoundSupported: Boolean,
     ancModes: List<AncModeOption>,
     boxImagePath: String?,
+    deviceImageKey: String?,
+    colorVariantKey: String?,
     connectedDeviceAddress: String,
     connectingDeviceAddress: String?,
     showConnectErrorDialog: Boolean,
@@ -79,10 +93,23 @@ internal fun EarphonesTabPage(
                 onGainLevelChange = onGainLevelChange,
                 ledEnabled = ledEnabled,
                 onLedEnabledChange = onLedEnabledChange,
+                promptToneEnabled = promptToneEnabled,
+                onPromptToneChange = onPromptToneChange,
+                promptVolume = promptVolume,
+                onPromptVolumeChange = onPromptVolumeChange,
+                headTrackingEnabled = headTrackingEnabled,
+                onHeadTrackingChange = onHeadTrackingChange,
+                lhdcEnabled = lhdcEnabled,
+                onLhdcChange = onLhdcChange,
+                dualConnectionEnabled = dualConnectionEnabled,
+                onDualConnectionChange = onDualConnectionChange,
+                capabilities = capabilities,
                 spatialAudioSupported = spatialAudioSupported,
                 spatialSoundSupported = spatialSoundSupported,
                 ancModes = ancModes,
                 boxImagePath = boxImagePath,
+                deviceImageKey = deviceImageKey,
+                colorVariantKey = colorVariantKey,
             )
         } else {
             DevicePickerPage(
