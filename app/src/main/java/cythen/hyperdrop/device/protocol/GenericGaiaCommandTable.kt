@@ -110,6 +110,16 @@ class GenericGaiaCommandTable(
     // ---- Receive path ------------------------------------------------------------
 
     override fun parse(payload: ByteArray): GaiaReport {
+        // GAIA v1/v2 negotiation uses vendor 0x000A and command 0x0300 (GET_API_VERSION), so it
+        // must be classified before the vendor-0x1D guard below — otherwise it is swallowed as
+        // Unknown. Real frame from a PUDDING: 00 0A 83 00 00 04 03 01, where 0x8300 is
+        // ACK(0x8000) | 0x0300. The command word is matched rather than just the vendor so other
+        // v1/v2 traffic is not misread as a handshake.
+        if (payload.size >= 4 && payload[0] == 0x00.toByte() && payload[1] == 0x0A.toByte()) {
+            val commandWord = ((payload[2].toInt() and 0xFF) shl 8) or (payload[3].toInt() and 0xFF)
+            if ((commandWord and 0x7FFF) == 0x0300) return GaiaReport.GaiaNegotiation
+        }
+
         if (payload.size < 4 || payload[0] != 0x00.toByte() || payload[1] != 0x1D.toByte()) {
             return GaiaReport.Unknown
         }
@@ -189,7 +199,6 @@ class GenericGaiaCommandTable(
         // Shared decoder — keep the byte layout rules in one place (GaiaFeaturesParser).
         GaiaFeaturesParser.parse(payload)?.let { return it }
 
-        if (payload.size >= 4 && payload[1] == 0x0A.toByte()) return GaiaReport.GaiaNegotiation
         return GaiaReport.Unknown
     }
 }

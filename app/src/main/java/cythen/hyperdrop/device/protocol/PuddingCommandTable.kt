@@ -162,9 +162,12 @@ object PuddingCommandTable : GaiaCommandTable {
             if (value == 0 || value == 1) return GaiaReport.DualConnection(value == 1)
         }
 
-        // The first v1 response is the GAIA API-version response (feature 0x0A).
+        // The first v1 response is the GAIA API-version response: vendor 0x000A, command 0x0300
+        // (0x8300 once the ACK bit is set). Check the command word, not just the vendor, so other
+        // v1/v2 traffic is not misread as a handshake.
         if (payload.size >= 4 && payload[0] == 0x00.toByte() && payload[1] == 0x0A.toByte()) {
-            return GaiaReport.GaiaNegotiation
+            val commandWord = ((payload[2].toInt() and 0xFF) shl 8) or (payload[3].toInt() and 0xFF)
+            if ((commandWord and 0x7FFF) == 0x0300) return GaiaReport.GaiaNegotiation
         }
 
         return GaiaReport.Unknown

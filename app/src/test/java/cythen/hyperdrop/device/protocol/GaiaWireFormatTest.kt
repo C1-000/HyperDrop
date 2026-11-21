@@ -175,6 +175,24 @@ class GaiaWireFormatTest {
     }
 
     @Test
+    fun `negotiation is matched on the command word, not just the vendor`() {
+        // vendor 0x000A with a different command must not be mistaken for the handshake.
+        assertEquals(
+            GaiaReport.Unknown,
+            GenericGaiaCommandTable().parse(hex(0x00, 0x0A, 0x01, 0x01, 0x00)),
+        )
+        assertEquals(
+            GaiaReport.Unknown,
+            PuddingCommandTable.parse(hex(0x00, 0x0A, 0x01, 0x01, 0x00)),
+        )
+        // The pudding table recognises the same ACK-ed handshake frame.
+        assertEquals(
+            GaiaReport.GaiaNegotiation,
+            PuddingCommandTable.parse(hex(0x00, 0x0A, 0x83, 0x00, 0x00, 0x04, 0x03, 0x01)),
+        )
+    }
+
+    @Test
     fun `pudding table shares the battery decoder`() {
         val report = PuddingCommandTable
             .parse(hex(0x00, 0x1D, 0x1B, 0x01, 0x01, 0x64, 0x02, 0x64, 0x03, 0x55))
