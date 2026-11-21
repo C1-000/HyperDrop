@@ -163,6 +163,12 @@
     <string name="device_adaptation_summary">Supported models and verification status</string>
     <string name="adaptation_verified">Verified on real hardware</string>
     <string name="adaptation_inferred">Protocol inferred (not verified)</string>
+    <string name="adaptation_control_profile">Control profile: %1$s</string>
+    <string name="form_factor_tws">TWS earbuds</string>
+    <string name="form_factor_one_piece">One-piece</string>
+    <string name="form_factor_headphones">Headphones</string>
+    <string name="form_factor_speaker">Speaker</string>
+    <string name="form_factor_wired_dongle">Wired / dongle</string>
 
     <string name="pudding_anc_basic">Basic</string>
     <string name="pudding_anc_adaptive">Adaptive</string>

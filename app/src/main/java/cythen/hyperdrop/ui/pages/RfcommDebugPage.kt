@@ -268,15 +268,15 @@ private fun HexInputField(
 }
 
 private fun RfcommDebugLogEntry.directionLabel(): String = when (tag.uppercase()) {
-    "RFCOMM/TX" -> "SEND"
-    "RFCOMM/RX" -> "RECV"
+    "LINK/TX", "RFCOMM/TX" -> "SEND"
+    "LINK/RX", "RFCOMM/RX" -> "RECV"
     "RFCOMM/DEBUG" -> "DEBUG"
     else -> "STATE"
 }
 
 private fun directionColor(entry: RfcommDebugLogEntry): Color = when (entry.tag.uppercase()) {
-    "RFCOMM/TX" -> Color(0xFF00A86B)
-    "RFCOMM/RX" -> Color(0xFF1677FF)
+    "LINK/TX", "RFCOMM/TX" -> Color(0xFF00A86B)
+    "LINK/RX", "RFCOMM/RX" -> Color(0xFF1677FF)
     "RFCOMM/DEBUG" -> Color(0xFF7C4DFF)
     else -> Color(0xFF6B7280)
 }

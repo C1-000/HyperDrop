@@ -10,6 +10,7 @@ import cythen.hyperdrop.pods.NoiseControlMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -121,15 +122,32 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `inferred model caps carry ANC path and gain mapping`() {
+    fun `inferred model has no declared capabilities until probing`() {
         val edge = DeviceRegistry.profileById("edge")
-        assertTrue(edge.capabilities.gainSupported)
-        assertEquals(3, edge.capabilities.ancModes.size)
+        // A name match alone is not evidence: the UI waits for GET_SUPPORTED_FEATURES.
+        assertFalse(edge.capabilities.gainSupported)
+        assertFalse(edge.capabilities.ledSupported)
+        assertFalse(edge.capabilities.lhdcSupported)
+        // It still carries the shared fallback vocabulary so ANC can be probed.
+        assertEquals(ControlProfiles.probeFallback, edge.control)
+        assertEquals(4, edge.capabilities.ancModes.size)
         // Pudding ANC set table is indexed by UI status 1..5.
         val pudding = DeviceModels.pudding.capabilities
         assertEquals(0, pudding.ancSetMap[1])  // UI status 1 = OFF -> wire 0
         assertEquals(4, pudding.ancSetMap[4])  // ADAPTIVE -> wire 4
         assertEquals(3, pudding.ancSetMap[5])  // WIND_REDUCTION -> wire 3
+    }
+
+    @Test
+    fun `mirage shares pudding control profile instead of copying it`() {
+        assertSame(DeviceModels.pudding.control, DeviceModels.mirage.control)
+        assertEquals(ControlProfiles.pudding, DeviceModels.mirage.control)
+        // The derived view is equal because it comes from the same source, not from a copy.
+        assertEquals(DeviceModels.pudding.capabilities.ancPath, DeviceModels.mirage.capabilities.ancPath)
+        assertEquals(
+            DeviceModels.pudding.capabilities.ancSetMap.toList(),
+            DeviceModels.mirage.capabilities.ancSetMap.toList(),
+        )
     }
 
     @Test

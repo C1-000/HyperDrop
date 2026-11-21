@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package cythen.hyperdrop.device.protocol
 
 /**
@@ -21,6 +23,16 @@ class GenericGaiaCommandTable(
 
     override val ancPath: AncPathKind get() = ancPathKind
 
+    override fun withAncPath(path: AncPathKind): GaiaCommandTable =
+        if (path == ancPathKind) this else copy(ancPathKind = path)
+
+    private fun copy(ancPathKind: AncPathKind) = GenericGaiaCommandTable(
+        ancPathKind = ancPathKind,
+        ancSetMap = ancSetMap,
+        ancGetMap = ancGetMap,
+        gainMap = gainMap,
+    )
+
     override val queryNoiseMode: ByteArray = when (ancPathKind) {
         AncPathKind.ANC_V2 -> byteArrayOf(0x00, 0x1D, 0x40, 0x03)
         AncPathKind.AUDIO_CURATION -> byteArrayOf(0x00, 0x1D, 0x10, 0x03)
@@ -37,6 +49,7 @@ class GenericGaiaCommandTable(
     // ---- Extended feature queries ------------------------------------------------
 
     override val querySupportedFeatures: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x01)
+    override val querySupportedFeaturesNext: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x02)
     override val querySpatialAudio: ByteArray = byteArrayOf(0x00, 0x1D, 0x24, 0x01)
     override val queryHeadTracking: ByteArray = byteArrayOf(0x00, 0x1D, 0x24, 0x03)
     override val queryVoiceConfig: ByteArray = byteArrayOf(0x00, 0x1D, 0x1C, 0x01)
@@ -104,10 +117,22 @@ class GenericGaiaCommandTable(
         val sub = payload[3].toInt() and 0xFF
 
         // ANC responses (SET echo / GET) carry one value byte at index 4.
+        //
+        // Official command words, from V3AncV2Plugin$COMMANDS / V3AudioCurationPlugin$COMMANDS:
+        //   feature 0x20 ANC_V2        — GET_CURRENT_MODE=0x03, SET_CURRENT_MODE=0x04
+        //   feature 0x08 AUDIO_CURATION— V1_GET_CURRENT_MODE=0x03, V1_SET_MODE=0x04
+        //   feature 0x02 ANC (V1)      — V1_GET_ANC_STATE=0x01, V1_SET_ANC_STATE=0x02
+        // The command word's high bits encode feature+type, so the RESPONSE twin is
+        // 0x41 for ANC_V2, 0x11 for AUDIO_CURATION and 0x05 for ANC V1.
+        //
+        // The ANC V1 branch is known-broken and unreachable in practice: the official app
+        // only builds V3ANCPlugin when a device *reports* feature 2, and its V1_GET_ANC_STATE
+        // request (0x01) does not match what this table sends (see AncPathKind.ANC_V1).
+        // Returning -1 keeps it from ever claiming a payload.
         val ancResponseCmd = when (ancPath) {
             AncPathKind.ANC_V2 -> 0x41
             AncPathKind.AUDIO_CURATION -> 0x11
-            AncPathKind.ANC_V1 -> 0x05
+            AncPathKind.ANC_V1 -> -1
         }
         if (cmd == ancResponseCmd && (sub == 0x03 || sub == 0x04) && payload.size >= 5) {
             val reported = payload[4].toInt() and 0xFF
@@ -116,24 +141,8 @@ class GenericGaiaCommandTable(
             if (ui != null) return GaiaReport.AncMode(ui, reported)
         }
 
-        // Battery: 00 1D 1B 01 [id, level]...
-        if (cmd == 0x1B && sub == 0x01 && payload.size >= 6) {
-            var left: Int? = null
-            var right: Int? = null
-            var case: Int? = null
-            var i = 4
-            while (i + 1 < payload.size) {
-                val id = payload[i].toInt() and 0xFF
-                val level = payload[i + 1].toInt() and 0xFF
-                if (level in 0..100) when (id) {
-                    1 -> left = level
-                    2 -> right = level
-                    3 -> case = level
-                }
-                i += 2
-            }
-            if (left != null || right != null || case != null) return GaiaReport.Battery(left, right, case)
-        }
+        // Battery: 00 1D 1B 01 [id, level]... — shared decoder, no charging bit in GAIA.
+        GaiaBatteryParser.parse(payload)?.let { return it }
 
         // DAC gain: 00 1D 1F 01/02 <wire>
         if (cmd == 0x1F && (sub == 0x01 || sub == 0x02) && payload.size >= 5) {
@@ -176,20 +185,9 @@ class GenericGaiaCommandTable(
             if (v == 0 || v == 1) return GaiaReport.DualConnection(v == 1)
         }
 
-        // Supported features: 00 1D 01 01 <bitmask words>
-        if (cmd == 0x01 && (sub == 0x01 || sub == 0x02)) {
-            val features = mutableSetOf<Int>()
-            var i = 4
-            while (i + 3 < payload.size) {
-                val word = ((payload[i].toInt() and 0xFF) shl 24) or
-                    ((payload[i + 1].toInt() and 0xFF) shl 16) or
-                    ((payload[i + 2].toInt() and 0xFF) shl 8) or
-                    (payload[i + 3].toInt() and 0xFF)
-                for (bit in 0..31) if (word and (1 shl bit) != 0) features += bit
-                i += 4
-            }
-            return GaiaReport.SupportedFeatures(features)
-        }
+        // Supported features: 00 1D 01 01/02 <hasMoreData> (<featureId> <version>)*
+        // Shared decoder — keep the byte layout rules in one place (GaiaFeaturesParser).
+        GaiaFeaturesParser.parse(payload)?.let { return it }
 
         if (payload.size >= 4 && payload[1] == 0x0A.toByte()) return GaiaReport.GaiaNegotiation
         return GaiaReport.Unknown

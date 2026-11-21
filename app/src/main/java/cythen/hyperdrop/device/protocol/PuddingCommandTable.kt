@@ -38,6 +38,12 @@ object PuddingCommandTable : GaiaCommandTable {
     override val queryLhdc: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x05)
     override val queryDualConnection: ByteArray = byteArrayOf(0x00, 0x1D, 0x28, 0x01)
 
+    // BASIC feature 0x00: COMMAND 0x0000, GET_SUPPORTED_FEATURES = 0x01.
+    // PUDDING runs GAIA 4.3 over SPP, so it should answer; the reply is the authoritative
+    // list of what this unit actually implements. NEXT = 0x02 continues when moreData is set.
+    override val querySupportedFeatures: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x01)
+    override val querySupportedFeaturesNext: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x02)
+
     override val ancCycle: List<Int> = listOf(2, 4, 5, 3, 1)
 
     /**
@@ -114,28 +120,13 @@ object PuddingCommandTable : GaiaCommandTable {
         }
 
         // Qualcomm Battery feature RESPONSE: 00 1D 1B 01 [batteryId, level]...
-        // Battery ids: 1=left, 2=right, 3=charging case.
-        if (payload.size >= 6 && matches(payload, 0x1B, 0x01)) {
-            var left: Int? = null
-            var right: Int? = null
-            var case: Int? = null
-            var i = 4
-            while (i + 1 < payload.size) {
-                val id = payload[i].toInt() and 0xFF
-                val level = payload[i + 1].toInt() and 0xFF
-                if (level in 0..100) {
-                    when (id) {
-                        1 -> left = level
-                        2 -> right = level
-                        3 -> case = level
-                    }
-                }
-                i += 2
-            }
-            if (left != null || right != null || case != null) {
-                return GaiaReport.Battery(left, right, case)
-            }
-        }
+        // Battery ids: 1=left, 2=right, 3=charging case. GAIA has no charging flag —
+        // see GaiaBatteryParser for the shared decoding rules.
+        GaiaBatteryParser.parse(payload)?.let { return it }
+
+        // Reproduce the generic table's feature-list handling so a PUDDING can report its
+        // own capabilities too (the whole point of probing rather than guessing).
+        GaiaFeaturesParser.parse(payload)?.let { return it }
 
         // QTIL DAC gain: 00 1D 1F 01/02 <wire>.
         if (matchesAny(payload, 0x1F, 0x01, 0x02)) {
@@ -178,10 +169,6 @@ object PuddingCommandTable : GaiaCommandTable {
 
         return GaiaReport.Unknown
     }
-
-    private fun matches(p: ByteArray, cmd: Int, sub: Int): Boolean =
-        p.size >= 5 && p[0] == 0x00.toByte() && p[1] == 0x1D.toByte() &&
-            p[2] == cmd.toByte() && p[3] == sub.toByte()
 
     private fun matchesAny(p: ByteArray, cmd: Int, vararg subs: Int): Boolean =
         p.size >= 5 && p[0] == 0x00.toByte() && p[1] == 0x1D.toByte() &&

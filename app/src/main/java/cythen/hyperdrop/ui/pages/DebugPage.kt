@@ -76,6 +76,9 @@ fun DebugPage(
                             append(profile.id)
                             append(" · ")
                             append(badge)
+                            // Two models sharing a control id are the same wire vocabulary.
+                            append(" · ")
+                            append(profile.control.id)
                             if (profile.note.isNotBlank()) {
                                 append(" · ")
                                 append(profile.note)

@@ -163,6 +163,12 @@
     <string name="device_adaptation_summary">已適配機型與驗證狀態</string>
     <string name="adaptation_verified">實機驗證</string>
     <string name="adaptation_inferred">協定推斷（未實機驗證）</string>
+    <string name="adaptation_control_profile">控制檔案：%1$s</string>
+    <string name="form_factor_tws">真無線耳機</string>
+    <string name="form_factor_one_piece">一體式</string>
+    <string name="form_factor_headphones">頭戴式</string>
+    <string name="form_factor_speaker">音箱</string>
+    <string name="form_factor_wired_dongle">有線 / 小尾巴</string>
 
     <string name="pudding_anc_basic">基礎</string>
     <string name="pudding_anc_adaptive">自適應</string>

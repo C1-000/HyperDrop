@@ -5,7 +5,6 @@ import android.app.StatusBarManager
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
-import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -22,9 +21,16 @@ import kotlinx.coroutines.launch
 import cythen.hyperdrop.BuildConfig
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.device.DeviceRegistry
+import cythen.hyperdrop.device.PodTransport
 import cythen.hyperdrop.device.protocol.GaiaCommandTable
 import cythen.hyperdrop.device.protocol.GaiaReport
 import cythen.hyperdrop.device.protocol.GaiaTransport
+import cythen.hyperdrop.pods.link.BleGaiaPodLink
+import cythen.hyperdrop.pods.link.LinkLogger
+import cythen.hyperdrop.pods.link.LinkProbe
+import cythen.hyperdrop.pods.link.PodLink
+import cythen.hyperdrop.pods.link.RfcommPodLink
+import cythen.hyperdrop.pods.link.toLinkHex
 import cythen.hyperdrop.utils.MediaControl
 import cythen.hyperdrop.utils.SystemApisUtils
 import cythen.hyperdrop.utils.SystemApisUtils.setIconVisibility
@@ -34,9 +40,7 @@ import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
 import cythen.hyperdrop.utils.miuiStrongToast.data.PodParams
 import java.io.IOException
-import java.io.InputStream
 import android.content.SharedPreferences
-import java.util.UUID
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -50,6 +54,15 @@ private const val APP_UI_ACTIVE_TIMEOUT_MS = 600_000L
 // ignored for this long (mirrors miuixmoondrop's "keep optimistic value on timeout").
 private const val WRITE_CONFIRM_GRACE_MS = 5_000L
 private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
+/** Upper bound on follow-up GET_SUPPORTED_FEATURES_NEXT requests per connection. */
+private const val MAX_FEATURE_PAGES = 8
+/**
+ * Transports this build can actually open, in preference order. RFCOMM first keeps the
+ * verified PUDDING/MIRAGE path byte-identical to previous releases; BLE GAIA is used when the
+ * probe finds no SPP service or the profile declares BLE only.
+ */
+private val IMPLEMENTED_TRANSPORTS = listOf(PodTransport.RFCOMM_GAIA, PodTransport.BLE_GAIA)
+
 
 /** UI/system write actions that must not reach the earbuds while control is yielded. */
 private val YIELD_BLOCKED_ACTIONS = setOf(
@@ -73,7 +86,12 @@ private val YIELD_BLOCKED_ACTIONS = setOf(
 class DeviceSession {
 
     // Basic Objects
-    private var socket: BluetoothSocket? = null
+    /**
+     * Active transport. Which implementation it is gets decided by `LinkProbe` at connect
+     * time, not by the profile: the official app also resolves the transport per device
+     * (`resolveBluetoothType()`) instead of consulting a compiled table.
+     */
+    private var link: PodLink? = null
     private var mContext: Context? = null
     lateinit var mDevice: BluetoothDevice
     private lateinit var mPrefs: SharedPreferences
@@ -105,6 +123,13 @@ class DeviceSession {
     private var currentLhdcEnabled: Boolean = false
     private var currentDualConnectionEnabled: Boolean = false
     private var currentHeadTrackingEnabled: Boolean = false
+    /** How many extra "supported features" pages we asked for since the last connect.
+     *  Bounded so a chatty/looping device cannot pin the link in a request storm. */
+    private var featurePagesRequested: Int = 0
+    /** GAIA features the connected earbud has reported in this session. Reset on every
+     *  connect so a different device can never inherit the previous one's feature list. */
+    private var observedFeatures: cythen.hyperdrop.device.protocol.ObservedFeatures =
+        cythen.hyperdrop.device.protocol.ObservedFeatures.UNKNOWN
     /** Timestamp until which a contradictory device report for LHDC is treated as a
      *  transient reconnect artifact and ignored (see [setLhdc]). */
     private var lhdcWriteGraceUntilMs = 0L
@@ -140,13 +165,11 @@ class DeviceSession {
         val reconnectPending: Boolean,
     )
 
-    // RFCOMM jobs
+    // Link jobs
     private var connectionJob: kotlinx.coroutines.Job? = null
     private var reconnectJob: kotlinx.coroutines.Job? = null
-    private var readerJob: kotlinx.coroutines.Job? = null
     private val reconnectAttempts = AtomicInteger(0)
     private var reconnectPending = false
-    private val decoder = GaiaTransport.StreamDecoder()
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(p0: Context?, p1: Intent?) {
@@ -405,16 +428,16 @@ class DeviceSession {
             transparencyVocalEnhancement = currentTransparencyVocalEnhancement,
             address = if (::mDevice.isInitialized) mDevice.address else null,
             deviceName = if (::mDevice.isInitialized) mDevice.name ?: cachedDeviceName else cachedDeviceName.takeIf { it.isNotEmpty() },
-            connected = isConnected && socket != null,
+            connected = isConnected && link?.isOpen == true,
             connecting = connectionJob?.isActive == true,
             reconnectPending = reconnectPending,
         )
     }
 
     private fun currentConnectionState(): String = when {
-        isConnected && socket != null && ::currentBatteryParams.isInitialized -> "connected"
+        isConnected && link?.isOpen == true && ::currentBatteryParams.isInitialized -> "connected"
         connectionJob?.isActive == true || reconnectPending -> "connecting"
-        isConnected && socket != null -> "connecting"
+        isConnected && link?.isOpen == true -> "connecting"
         else -> "disconnected"
     }
 
@@ -470,6 +493,11 @@ class DeviceSession {
     private fun miuiBatteryValue(params: PodParams?): String {
         if (params?.isConnected != true) return "255"
         val value = params.battery.coerceIn(0, 100)
+        // HyperOS' status-bar contract packs charging into bit 7 of this string field. That is
+        // a *UI* convention, not something the earbud reports: GAIA battery records are
+        // [batteryId, level] with no charging flag (BatteryLevel.smali:17-21), so isCharging
+        // stays false on the GAIA path. Do not confuse this with the legacy OPPO AA protocol,
+        // where the earbud itself encoded charging as 0x80 in the battery value.
         return (if (params.isCharging) value or 128 else value).toString()
     }
 
@@ -584,15 +612,87 @@ class DeviceSession {
         }
     }
 
-    private fun createRfcommSocket(device: BluetoothDevice): BluetoothSocket {
-        return device.createRfcommSocketToServiceRecord(UUID.fromString(commandTable().sppUuid))
+    /**
+     * Build the link for this device.
+     *
+     * The transport is decided at connection time from what the device advertises, mirroring
+     * the official app's `resolveBluetoothType()`: BLE when the GAIA GATT service is present,
+     * otherwise RFCOMM/SPP. 9ECA is still unimplemented, so a device that only advertises the
+     * 9ECA service falls back to RFCOMM exactly as this build did before.
+     *
+     * A verified model is pinned to the transport it was confirmed on. Its probe result is
+     * still logged, but it never steers the choice: PUDDING/MIRAGE work over SPP on real
+     * hardware, and a firmware that also advertises the GAIA GATT service must not move them
+     * onto a transport nobody has tested.
+     */
+    private fun openLink(): PodLink {
+        val profile = DeviceRegistry.profileFor(deviceName())
+        val probe = LinkProbe.probe(mContext ?: throw IOException("no context"), mDevice)
+        Log.d(TAG, "link probe: ${LinkProbe.describe(probe)}")
+        RfcommLog.i(mContext, TAG, "probe: ${LinkProbe.describe(probe)}")
+
+        val probed = (probe as? LinkProbe.ProbeResult.Candidates)?.transports.orEmpty()
+        val order = if (profile.verified) {
+            Log.d(TAG, "verified profile ${profile.id}: transport pinned to ${profile.transports.first().name}")
+            profile.transports
+        } else {
+            LinkProbe.resolveOrder(profile.transports, probed)
+        }
+        Log.d(TAG, "link candidate order: ${order.joinToString { it.name }}")
+
+        val chosen = order.firstOrNull { it in IMPLEMENTED_TRANSPORTS }
+            ?: IMPLEMENTED_TRANSPORTS.first()
+        if (chosen != order.first()) {
+            Log.w(TAG, "preferred transport ${order.first().name} unimplemented; using ${chosen.name}")
+            RfcommLog.w(mContext, TAG, "${order.first().name} unimplemented, using ${chosen.name}")
+        }
+
+        val linkLogger = LinkLogger { direction, bytes, _ ->
+            // The reader thread and the sender both land here; RfcommLog already
+            // serialises on its own lock and caps its buffer.
+            RfcommLog.d(
+                mContext,
+                if (direction == LinkLogger.Direction.RX) "LINK/RX" else "LINK/TX",
+                bytes.toLinkHex(),
+            )
+        }
+        val newLink: PodLink = when (chosen) {
+            PodTransport.BLE_GAIA -> BleGaiaPodLink(
+                context = mContext ?: throw IOException("no context"),
+                device = mDevice,
+                logger = linkLogger,
+                isCancelled = { yielded },
+            )
+
+            // RFCOMM_GAIA, plus BLE_SRC_9ECA as a stand-in: 9ECA is not in
+            // IMPLEMENTED_TRANSPORTS, so a 9ECA-only device lands here and gets the same
+            // RFCOMM attempt this build made before link probing existed.
+            PodTransport.RFCOMM_GAIA, PodTransport.BLE_SRC_9ECA -> RfcommPodLink(
+                device = mDevice,
+                sppUuid = profile.commandTable.sppUuid,
+                logger = linkLogger,
+                isCancelled = { yielded },
+            )
+        }
+        newLink.listener = object : PodLink.Listener {
+            override fun onPayload(payload: ByteArray) {
+                handleGaiaPayload(payload)
+            }
+
+            override fun onClosed(reason: String) {
+                if (isConnected) {
+                    Log.d(TAG, "link closed: $reason")
+                    scheduleReconnect(reason)
+                }
+            }
+        }
+        return newLink
     }
 
     fun connectPod(context: Context, device: BluetoothDevice, prefs: SharedPreferences, appRequested: Boolean = false) {
         connectionJob?.cancel()
         reconnectJob?.cancel()
-        readerJob?.cancel()
-        closeSocketOnly()
+        closeLinkOnly()
         mContext = context
         mDevice = device
         mPrefs = prefs
@@ -651,7 +751,7 @@ class DeviceSession {
 
         // Decide whether the official app currently owns the channel before opening RFCOMM.
         evaluateYield()
-        connectRfcomm(initialDelayMs = 500L)
+        connectLink(initialDelayMs = 500L)
 
     }
 
@@ -703,9 +803,8 @@ class DeviceSession {
         yielded = true
         connectionJob?.cancel()
         reconnectJob?.cancel()
-        readerJob?.cancel()
         reconnectPending = false
-        closeSocketOnly()
+        closeLinkOnly()
         Log.i(TAG, "yield control: official app is alive")
         // Drop the MIUI bluetooth card: it would otherwise keep showing the last battery/ANC
         // snapshot we pushed, which is stale once the official app owns the channel.
@@ -732,7 +831,7 @@ class DeviceSession {
         Log.i(TAG, "resume control: official app lease expired")
         sendControlStateBroadcast(OppoPodsAction.ACTION_CONTROL_RESUMED)
         if (isConnected && ::mDevice.isInitialized) {
-            connectRfcomm(initialDelayMs = 800L)
+            connectLink(initialDelayMs = 800L)
         }
     }
 
@@ -810,51 +909,57 @@ class DeviceSession {
         }
     }
 
-    private fun connectRfcomm(initialDelayMs: Long = 0L) {
+    private fun connectLink(initialDelayMs: Long = 0L) {
         connectionJob?.cancel()
         connectionJob = CoroutineScope(Dispatchers.IO).launch {
             if (initialDelayMs > 0) delay(initialDelayMs)
             if (!isConnected || !::mDevice.isInitialized) return@launch
             if (yielded) {
-                Log.d(TAG, "RFCOMM connect skipped while yielded")
+                Log.d(TAG, "link connect skipped while yielded")
                 return@launch
             }
-            closeSocketOnly()
+            closeLinkOnly()
             try {
-                val newSocket = createRfcommSocket(mDevice)
-                newSocket.connect()
-                // A yield may have landed while connect() was blocking (cancellation
-                // does not interrupt the blocking call). Never keep a socket the
-                // official app is trying to own, and never start a reader after
-                // closeSocketOnly() ran in yieldControl().
+                val newLink = openLink()
+                newLink.open()
+                // A yield may have landed while the transport was connecting (cancellation
+                // does not interrupt the blocking connect). Never keep a link the official
+                // app is trying to own, and never start a reader after closeLinkOnly() ran
+                // inside yieldControl().
                 if (yielded) {
-                    runCatching { newSocket.close() }
-                    Log.d(TAG, "RFCOMM socket released: yielded during connect")
+                    newLink.close()
+                    Log.d(TAG, "link released: yielded during connect")
                     return@launch
                 }
-                socket = newSocket
+                link = newLink
                 reconnectAttempts.set(0)
                 reconnectPending = false
-                Log.d(TAG, "RFCOMM connected! uuid=${commandTable().sppUuid}")
+                featurePagesRequested = 0
+                observedFeatures = cythen.hyperdrop.device.protocol.ObservedFeatures.UNKNOWN
+                Log.d(TAG, "link connected! uuid=${commandTable().sppUuid}")
                 RfcommLog.i(mContext, TAG, "connected uuid=${commandTable().sppUuid}")
                 changeUIConnectionState("connecting")
 
-                startPacketReader(newSocket.inputStream)
-
-                delay(180)
+                delay(HandshakeSequence.LEAD_IN_MS)
                 // Match the official MOONDROP app: negotiate GAIA with a v1 API-version
-                // request, then use v4 for PUDDING commands.
-                sendPacketSafe(GaiaTransport.v1(commandTable().queryGaiaVersion))
-                delay(180)
-                sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode))
-                delay(100)
-                sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
-                delay(100)
-                sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
-                delay(100)
-                sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))
-                delay(80)
-                sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
+                // request, then use v4 for the regular commands.
+                sendNegotiation(GaiaTransport.v1(commandTable().queryGaiaVersion), newLink)
+                delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.NEGOTIATE_VERSION, newLink.transport))
+                sendPayload(commandTable().queryNoiseMode)
+                delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.NOISE_MODE, newLink.transport))
+                sendPayload(commandTable().queryGainLevel)
+                delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.GAIN, newLink.transport))
+                sendPayload(commandTable().queryLedState)
+                delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.LED, newLink.transport))
+                sendPayload(commandTable().querySupportedBatteries)
+                delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.SUPPORTED_BATTERIES, newLink.transport))
+                sendPayload(commandTable().queryBatteryLevels)
+                // Ask what the earbud actually implements. The reply gates which controls the
+                // UI offers (`DeviceRegistry.applyObservedFeatures`).
+                commandTable().querySupportedFeatures?.let {
+                    delay(HandshakeSequence.stepDelayMs(HandshakeSequence.Step.BATTERY_LEVELS, newLink.transport))
+                    sendPayload(it, "supported features query")
+                }
 
                 changeUIConnectionState("connected")
                 sendAppStatusBroadcast(OppoPodsAction.ACTION_PODS_CONNECTED) {
@@ -866,7 +971,7 @@ class DeviceSession {
                 }
                 mShowedConnectedToast = true
             } catch (e: IOException) {
-                Log.e(TAG, "RFCOMM connect failed", e)
+                Log.e(TAG, "link connect failed", e)
                 changeUIConnectionState("error")
                 scheduleReconnect("connect failed")
             }
@@ -881,75 +986,43 @@ class DeviceSession {
         if (yielded) return
         if (!isConnected || !::mDevice.isInitialized || mContext == null) return
         RfcommLog.w(mContext, TAG, "schedule reconnect reason=$reason immediate=$immediate")
-        closeSocketOnly()
+        closeLinkOnly()
         reconnectPending = true
         if (immediate) {
             if (connectionJob?.isActive == true) {
-                Log.d(TAG, "immediate RFCOMM reconnect skipped: connecting reason=$reason")
+                Log.d(TAG, "immediate link reconnect skipped: connecting reason=$reason")
                 return
             }
-            Log.d(TAG, "immediate RFCOMM reconnect reason=$reason")
+            Log.d(TAG, "immediate link reconnect reason=$reason")
             reconnectJob?.cancel()
             reconnectJob = null
             reconnectPending = false
-            connectRfcomm()
+            connectLink()
             return
         }
         if (reconnectJob?.isActive == true) {
-            Log.d(TAG, "RFCOMM reconnect already scheduled reason=$reason")
+            Log.d(TAG, "link reconnect already scheduled reason=$reason")
             return
         }
         val attempt = reconnectAttempts.incrementAndGet()
-        Log.d(TAG, "schedule RFCOMM reconnect reason=$reason attempt=$attempt delay=${AUTO_RECONNECT_DELAY_MS}ms")
+        Log.d(TAG, "schedule link reconnect reason=$reason attempt=$attempt delay=${AUTO_RECONNECT_DELAY_MS}ms")
         reconnectJob = CoroutineScope(Dispatchers.IO).launch {
             delay(AUTO_RECONNECT_DELAY_MS)
             reconnectJob = null
             reconnectPending = false
-            connectRfcomm()
+            connectLink()
         }
     }
 
     private fun reconnectNowForRequest(reason: String) {
-        if (socket != null && !reconnectPending) return
+        if (link?.isOpen == true && !reconnectPending) return
         scheduleReconnect(reason, immediate = true)
     }
 
-    private fun closeSocketOnly() {
-        readerJob?.cancel()
-        readerJob = null
-        decoder.reset()
-        try {
-            socket?.close()
-        } catch (_: IOException) {}
-        socket = null
-    }
-
-    private fun startPacketReader(inputStream: InputStream) {
-        readerJob?.cancel()
-        readerJob = CoroutineScope(Dispatchers.IO).launch {
-            val buffer = ByteArray(1024)
-            try {
-                while (isConnected) {
-                    val bytesRead = inputStream.read(buffer)
-                    if (bytesRead > 0) {
-                        val chunk = buffer.copyOfRange(0, bytesRead)
-                        RfcommLog.d(mContext, "RFCOMM/RX", chunk.toHexString(HexFormat.UpperCase))
-                        decoder.feed(chunk).forEach(::handleGaiaPayload)
-                    } else if (bytesRead == -1) {
-                        Log.d(TAG, "RFCOMM stream ended")
-                        RfcommLog.w(mContext, TAG, "stream ended")
-                        scheduleReconnect("stream ended")
-                        break
-                    }
-                }
-            } catch (e: IOException) {
-                if (isConnected) {
-                    Log.e(TAG, "RFCOMM read error", e)
-                    RfcommLog.e(mContext, TAG, "read error: ${e.message.orEmpty()}")
-                    scheduleReconnect("read error")
-                }
-            }
-        }
+    private fun closeLinkOnly() {
+        val current = link
+        link = null
+        runCatching { current?.close() }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
@@ -1033,7 +1106,25 @@ class DeviceSession {
                     Log.i(TAG, "dual connection: ${report.enabled}")
                 }
             }
-            is GaiaReport.SupportedFeatures -> Log.i(TAG, "supported features: ${report.features}")
+            is GaiaReport.SupportedFeatures -> {
+                observedFeatures = observedFeatures.merge(report.features, report.moreData)
+                Log.i(
+                    TAG,
+                    "supported features: ${observedFeatures.features} " +
+                        "pages=${observedFeatures.pages} complete=${observedFeatures.complete}",
+                )
+                publishObservedFeatures()
+                // GetSupportedFeaturesData carries `hasMoreData`; the official client keeps
+                // asking with V1_GET_SUPPORTED_FEATURES_NEXT (command 0x02) until it clears.
+                if (report.moreData && featurePagesRequested < MAX_FEATURE_PAGES) {
+                    featurePagesRequested++
+                    commandTable().querySupportedFeaturesNext?.let { next ->
+                        CoroutineScope(Dispatchers.IO).launch {
+                            sendPayload(next, "supported features next page")
+                        }
+                    }
+                }
+            }
             GaiaReport.GaiaNegotiation -> {
                 Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
             }
@@ -1050,11 +1141,10 @@ class DeviceSession {
         yieldWatchJob = null
         connectionJob?.cancel()
         reconnectJob?.cancel()
-        readerJob?.cancel()
         reconnectAttempts.set(0)
         reconnectPending = false
 
-        closeSocketOnly()
+        closeLinkOnly()
 
         mContext?.let {
             stopRoutesScan()
@@ -1090,25 +1180,75 @@ class DeviceSession {
         MediaControl.mContext = null
     }
 
-    private fun sendPacketSafe(packet: ByteArray, requestReason: String? = null) {
+    /**
+     * Send one unframed GAIA payload. Framing belongs to the link, because RFCOMM wraps the
+     * payload in a 0xFF-framed packet while GAIA-over-BLE writes it bare.
+     */
+    private fun sendPayload(payload: ByteArray?, requestReason: String? = null) {
+        if (payload == null) return
         if (yielded) {
             Log.d(TAG, "dropped GAIA write while yielded")
             return
         }
         if (requestReason != null) reconnectNowForRequest(requestReason)
-        try {
-            val currentSocket = socket ?: run {
-                RfcommLog.w(mContext, "RFCOMM/TX", "socket null: ${packet.toHexString(HexFormat.UpperCase)}")
-                scheduleReconnect("socket null before send", immediate = requestReason != null)
-                return
-            }
-            RfcommLog.d(mContext, "RFCOMM/TX", packet.toHexString(HexFormat.UpperCase))
-            currentSocket.outputStream.write(packet)
-            currentSocket.outputStream.flush()
-        } catch (e: IOException) {
-            Log.e(TAG, "Send packet failed", e)
-            RfcommLog.e(mContext, TAG, "send failed: ${e.message.orEmpty()}")
-            scheduleReconnect("send error", immediate = requestReason != null)
+        val current = link
+        if (current == null || !current.isOpen) {
+            RfcommLog.w(mContext, "LINK/TX", "link closed: ${payload.toHexString(HexFormat.UpperCase)}")
+            scheduleReconnect("link closed before send", immediate = requestReason != null)
+            return
+        }
+        if (!current.send(payload)) {
+            // The link reports write failures through Listener.onClosed, which already
+            // schedules the reconnect; logging here is all that is left to do.
+            Log.e(TAG, "Send payload failed")
+        }
+    }
+
+    /**
+     * Send the GAIA v1/v2 API-version negotiation.
+     *
+     * The frame differs per transport: RFCOMM carries the v1 framing header, while BLE writes
+     * the bare packet. Passing an RFCOMM-framed buffer to a GATT write would put a stray `FF`
+     * in front of the vendor id that the earbud never sees from the official client.
+     */
+    private fun sendNegotiation(v1Frame: ByteArray, target: PodLink) {
+        if (target.transport == PodTransport.BLE_GAIA) {
+            sendBareFrame(GaiaTransport.stripFrame(v1Frame))
+        } else {
+            sendRawFrame(v1Frame)
+        }
+    }
+
+    /** Write bytes to a BLE link that must not carry RFCOMM framing. */
+    private fun sendBareFrame(frame: ByteArray) {
+        if (yielded) {
+            Log.d(TAG, "dropped GAIA write while yielded")
+            return
+        }
+        val current = link
+        if (current == null || !current.isOpen) {
+            RfcommLog.w(mContext, "LINK/TX", "link closed: ${frame.toHexString(HexFormat.UpperCase)}")
+            scheduleReconnect("link closed before send")
+            return
+        }
+        if (!current.sendRaw(frame)) Log.e(TAG, "Send bare frame failed")
+    }
+
+    /** Send bytes that are already framed (the v1 negotiation frame, debug console input). */
+    private fun sendRawFrame(frame: ByteArray, requestReason: String? = null) {
+        if (yielded) {
+            Log.d(TAG, "dropped GAIA write while yielded")
+            return
+        }
+        if (requestReason != null) reconnectNowForRequest(requestReason)
+        val current = link
+        if (current == null || !current.isOpen) {
+            RfcommLog.w(mContext, "LINK/TX", "link closed: ${frame.toHexString(HexFormat.UpperCase)}")
+            scheduleReconnect("link closed before send", immediate = requestReason != null)
+            return
+        }
+        if (!current.sendRaw(frame)) {
+            Log.e(TAG, "Send raw frame failed")
         }
     }
 
@@ -1121,7 +1261,7 @@ class DeviceSession {
         }
         val packet = normalized.hexToByteArray()
         RfcommLog.i(mContext, "RFCOMM/DEBUG", "send ${packet.size} bytes")
-        sendPacketSafe(packet, "rfcomm debug send")
+        sendRawFrame(packet, "rfcomm debug send")
     }
 
     fun setTransparencyVocalEnhancement(enabled: Boolean) {
@@ -1130,10 +1270,10 @@ class DeviceSession {
             return
         }
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "transparency vocal")
+            sendPayload(packet, "transparency vocal")
             commandTable().queryVoiceConfig?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "voice config query")
+                sendPayload(q, "voice config query")
             }
         }
     }
@@ -1145,10 +1285,10 @@ class DeviceSession {
             return
         }
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "spatial audio")
+            sendPayload(packet, "spatial audio")
             commandTable().querySpatialAudio?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "spatial audio query")
+                sendPayload(q, "spatial audio query")
             }
         }
     }
@@ -1157,10 +1297,10 @@ class DeviceSession {
     fun setHeadTracking(enabled: Boolean) {
         val packet = commandTable().setHeadTracking(enabled) ?: return
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "head tracking")
+            sendPayload(packet, "head tracking")
             commandTable().queryHeadTracking?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "head tracking query")
+                sendPayload(q, "head tracking query")
             }
         }
     }
@@ -1175,10 +1315,10 @@ class DeviceSession {
         currentVoiceIndex = index
         changeUIPromptTone(enabled, currentPromptVolume, index)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "prompt tone")
+            sendPayload(packet, "prompt tone")
             commandTable().queryVoiceConfig?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "voice config query")
+                sendPayload(q, "voice config query")
             }
         }
     }
@@ -1199,10 +1339,10 @@ class DeviceSession {
         lhdcWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
         changeUILhdc(enabled)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "LHDC")
+            sendPayload(packet, "LHDC")
             commandTable().queryLhdc?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "LHDC query")
+                sendPayload(q, "LHDC query")
             }
         }
     }
@@ -1214,19 +1354,25 @@ class DeviceSession {
         dualWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
         changeUIDualConnection(enabled)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "dual connection")
+            sendPayload(packet, "dual connection")
             commandTable().queryDualConnection?.let { q ->
                 delay(140)
-                sendPacketSafe(GaiaTransport.v4(q), "dual connection query")
+                sendPayload(q, "dual connection query")
             }
         }
     }
 
-    /** Ask the earbud for its supported-feature bitmask (feature 0x00). */
+    /**
+     * Ask the earbud which GAIA features it implements (feature 0x00, command 0x01).
+     *
+     * The reply is a list of `(featureId, version)` byte pairs, not a bitmask; see
+     * [cythen.hyperdrop.device.protocol.GenericGaiaCommandTable.parse]. This only logs the
+     * result today, and gating the UI on it is a later phase.
+     */
     fun querySupportedFeatures() {
         val query = commandTable().querySupportedFeatures ?: return
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(query), "supported features query")
+            sendPayload(query, "supported features query")
         }
     }
 
@@ -1238,9 +1384,9 @@ class DeviceSession {
         changeUIGainLevel(currentGainLevel)
         CoroutineScope(Dispatchers.IO).launch {
             Log.d(TAG, "set gain: ui=$level wire=${commandTable().gainUiToWire(level)}")
-            sendPacketSafe(GaiaTransport.v4(packet), "gain")
+            sendPayload(packet, "gain")
             delay(140)
-            sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
+            sendPayload(commandTable().queryGainLevel)
         }
     }
 
@@ -1248,9 +1394,9 @@ class DeviceSession {
         currentLedEnabled = enabled
         changeUILedState(enabled)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(commandTable().setLedEnabled(enabled)), "LED")
+            sendPayload(commandTable().setLedEnabled(enabled), "LED")
             delay(140)
-            sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
+            sendPayload(commandTable().queryLedState)
         }
     }
 
@@ -1265,17 +1411,51 @@ class DeviceSession {
     private fun deviceName(): String =
         if (::mDevice.isInitialized) mDevice.name ?: cachedDeviceName else cachedDeviceName
 
-    private fun commandTable(): GaiaCommandTable =
-        DeviceRegistry.profileFor(deviceName()).commandTable
+    /**
+     * The profile's command table, re-aimed at the ANC feature the device actually answers on.
+     *
+     * The profile's translation tables (uiStatus -> wire) are untouched: [withAncPath] only
+     * changes which GAIA feature carries the mode. For a model with no observations yet, or a
+     * verified model, this is the table exactly as declared.
+     *
+     * Note this never runs for a verified model: [DeviceRegistry.resolveAncPath] pins a verified
+     * profile to its declared path, so `resolved == declared.ancPath` and the specific
+     * [ControlProfile.verifiedTable] (PUDDING's) is returned as-is. The re-aim branch therefore
+     * only ever applies to the generic derived table.
+     */
+    private fun commandTable(): GaiaCommandTable {
+        val declared = DeviceRegistry.profileFor(deviceName()).commandTable
+        val resolved = currentCapabilities().ancPath
+        return if (resolved == declared.ancPath) declared else declared.withAncPath(resolved)
+    }
 
     private fun currentCapabilities(): cythen.hyperdrop.device.DeviceCapabilities {
-        return cythen.hyperdrop.device.DeviceRegistry.detectDeviceCapabilities(
+        return cythen.hyperdrop.device.DeviceRegistry.applyObservedFeatures(
             deviceName = deviceName(),
+            observed = observedFeatures,
             adaptiveOverride = ConfigManager.adaptiveCapabilityOverride(),
             spatialAudioOverride = ConfigManager.spatialAudioCapabilityOverride(),
             spatialSoundSwitchOverride = ConfigManager.spatialSoundSwitchCapabilityOverride(),
             ancImplementationOverride = ConfigManager.ancImplementationCapabilityOverride(),
         )
+    }
+
+    /**
+     * Push the capabilities implied by the device's own feature list to the UI.
+     *
+     * The UI itself holds no state: it re-derives capabilities from the device name, so it
+     * cannot see a list reported over RFCOMM. Carrying the observed features across is what
+     * lets a control the profile left off appear once the earbud says it supports it.
+     */
+    private fun publishObservedFeatures() {
+        val features = observedFeatures.features
+        if (features.isEmpty()) return
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_PODS_CAPABILITIES_CHANGED) {
+            if (::mDevice.isInitialized) putExtra("address", mDevice.address)
+            putExtra("features", features.toIntArray())
+            putExtra("anc_path", currentCapabilities().ancPath.name)
+            putExtra("complete", observedFeatures.complete)
+        }
     }
 
     private fun Int.floorMod(divisor: Int): Int = ((this % divisor) + divisor) % divisor
@@ -1286,20 +1466,17 @@ class DeviceSession {
         currentAnc = mode
         changeUIAncStatus(mode)
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(GaiaTransport.v4(packet), "noise control")
+            sendPayload(packet, "noise control")
             delay(180)
-            sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode))
+            sendPayload(commandTable().queryNoiseMode)
         }
     }
 
     fun queryBattery() {
         CoroutineScope(Dispatchers.IO).launch {
-            sendPacketSafe(
-                GaiaTransport.v4(commandTable().querySupportedBatteries),
-                "battery query"
-            )
+            sendPayload(commandTable().querySupportedBatteries, "battery query")
             delay(80)
-            sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
+            sendPayload(commandTable().queryBatteryLevels)
         }
     }
 
@@ -1311,27 +1488,27 @@ class DeviceSession {
 
     private suspend fun sendStatusQueryPackets(immediateReconnect: Boolean = true) {
         val reason = if (immediateReconnect) "status query" else null
-        sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode), reason)
+        sendPayload(commandTable().queryNoiseMode, reason)
         delay(100)
-        sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
+        sendPayload(commandTable().queryGainLevel)
         delay(100)
-        sendPacketSafe(GaiaTransport.v4(commandTable().queryLedState))
+        sendPayload(commandTable().queryLedState)
         delay(100)
         // Space the feature queries too: back-to-back RFCOMM frames can be coalesced
         // by the earbud and one of the responses lost.
-        commandTable().querySpatialAudio?.let { sendPacketSafe(GaiaTransport.v4(it), "spatial audio query") }
+        commandTable().querySpatialAudio?.let { sendPayload(it, "spatial audio query") }
         delay(100)
-        commandTable().queryHeadTracking?.let { sendPacketSafe(GaiaTransport.v4(it), "head tracking query") }
+        commandTable().queryHeadTracking?.let { sendPayload(it, "head tracking query") }
         delay(100)
-        commandTable().queryVoiceConfig?.let { sendPacketSafe(GaiaTransport.v4(it), "voice config query") }
+        commandTable().queryVoiceConfig?.let { sendPayload(it, "voice config query") }
         delay(100)
-        commandTable().queryLhdc?.let { sendPacketSafe(GaiaTransport.v4(it), "LHDC query") }
+        commandTable().queryLhdc?.let { sendPayload(it, "LHDC query") }
         delay(100)
-        commandTable().queryDualConnection?.let { sendPacketSafe(GaiaTransport.v4(it), "dual connection query") }
+        commandTable().queryDualConnection?.let { sendPayload(it, "dual connection query") }
         delay(100)
-        sendPacketSafe(GaiaTransport.v4(commandTable().querySupportedBatteries))
+        sendPayload(commandTable().querySupportedBatteries)
         delay(80)
-        sendPacketSafe(GaiaTransport.v4(commandTable().queryBatteryLevels))
+        sendPayload(commandTable().queryBatteryLevels)
     }
 
     fun disconnectAudio(context: Context, device: BluetoothDevice?) {

@@ -9,6 +9,9 @@ object OppoPodsAction {
     const val ACTION_CONNECT_POD_REQUEST = "cythen.hyperdrop.action.connect_pod_request"
     const val ACTION_DISCONNECT_POD_REQUEST = "cythen.hyperdrop.action.disconnect_pod_request"
     const val ACTION_PODS_CONNECTION_STATE_CHANGED = "cythen.hyperdrop.action.pods_connection_state_changed"
+    /** Device-reported GAIA feature list, pushed so the UI can gate controls on what the
+     *  earbud says it implements instead of only on the model profile. */
+    const val ACTION_PODS_CAPABILITIES_CHANGED = "cythen.hyperdrop.action.pods_capabilities_changed"
     const val ACTION_PODS_BATTERY_CHANGED = "cythen.hyperdrop.action.pods_battery_changed"
     const val ACTION_PODS_WEAR_STATUS_CHANGED = "cythen.hyperdrop.action.pods_wear_status_changed"
     const val ACTION_ANC_SELECT = "cythen.hyperdrop.action.anc_select"

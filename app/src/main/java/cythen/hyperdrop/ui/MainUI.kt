@@ -56,6 +56,7 @@ import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.device.DeviceProfile
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.SimulatedDevice
+import cythen.hyperdrop.device.protocol.ObservedFeatures
 import cythen.hyperdrop.pods.VirtualDeviceSession
 import cythen.hyperdrop.ui.pages.AboutPage
 import cythen.hyperdrop.ui.pages.AdaptationStatusPage
@@ -181,6 +182,9 @@ fun MainUI(
     val spatialSoundSwitchCapabilityOverride = remember { mutableStateOf(appConfig.spatialSoundSwitchCapabilityOverride) }
     val ancImplementationCapabilityOverride = remember { mutableStateOf(appConfig.ancImplementationCapabilityOverride) }
     val simulatedDevices = remember { mutableStateOf(appConfig.simulatedDevices) }
+    /** GAIA features the connected earbud reported, pushed by the session over RFCOMM.
+     *  Cleared whenever the connection reports a different device. */
+    var observedFeatures by remember { mutableStateOf(ObservedFeatures.UNKNOWN) }
 
     /** Ask whoever owns the active session to re-emit its cached state. */
     fun requestUiSync() {
@@ -249,8 +253,9 @@ fun MainUI(
     val displayAnc = ancMode.value
     val displayTransparencyVocalEnhancement = transparencyVocalEnhancement.value
     val displayTitle = mainTitle.value.takeIf { it.isNotBlank() && hookConnected.value } ?: mainTitle.value
-    val displayCapabilities = DeviceRegistry.detectDeviceCapabilities(
+    val displayCapabilities = DeviceRegistry.applyObservedFeatures(
         deviceName = displayTitle,
+        observed = observedFeatures,
         adaptiveOverride = adaptiveCapabilityOverride.value,
         spatialAudioOverride = spatialAudioCapabilityOverride.value,
         spatialSoundSwitchOverride = spatialSoundSwitchCapabilityOverride.value,
@@ -386,6 +391,13 @@ fun MainUI(
                         pending.dualConnection.value = false
                     }
 
+                    OppoPodsAction.ACTION_PODS_CAPABILITIES_CHANGED -> {
+                        observedFeatures = ObservedFeatures(
+                            features = p1.getIntArrayExtra("features")?.toSet() ?: emptySet(),
+                            complete = p1.getBooleanExtra("complete", false),
+                        )
+                    }
+
                     OppoPodsAction.ACTION_PODS_CONNECTED -> {
                         val deviceName = p1.getStringExtra("device_name")
                         val shouldOpenEarphones = connectingDeviceAddress != null || !hasAppliedDefaultTab
@@ -430,6 +442,7 @@ fun MainUI(
                         connectedDeviceAddress = ""
                         hookConnectionState = "disconnected"
                         hookConnected.value = false
+                        observedFeatures = ObservedFeatures.UNKNOWN
                     }
 
                     OppoPodsAction.ACTION_MODULE_BLUETOOTH_SERVICE_ALIVE -> {
@@ -468,6 +481,7 @@ fun MainUI(
             addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTION_STATE_CHANGED)
+            addAction(OppoPodsAction.ACTION_PODS_CAPABILITIES_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_DISCONNECTED)
             addAction(OppoPodsAction.ACTION_MODULE_BLUETOOTH_SERVICE_ALIVE)
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)

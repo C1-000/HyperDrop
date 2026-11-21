@@ -1,18 +1,72 @@
 package cythen.hyperdrop.device
 
 import cythen.hyperdrop.R
-import cythen.hyperdrop.device.protocol.AncPathKind
 import cythen.hyperdrop.device.protocol.GaiaCommandTable
-import cythen.hyperdrop.device.protocol.GenericGaiaCommandTable
-import cythen.hyperdrop.device.protocol.NoOpGaiaCommandTable
-import cythen.hyperdrop.device.protocol.PuddingCommandTable
 import cythen.hyperdrop.pods.AncImplementation
 import cythen.hyperdrop.pods.NoiseControlMode
 
-/** How a model talks to the earbuds. Only RFCOMM/GAIA v4 is implemented in this build. */
-enum class PodTransport { BLE_GAIA, RFCOMM_GAIA, BLE_SRC_9ECA }
+/**
+ * How a model talks to the earbuds.
+ *
+ * A profile's [DeviceProfile.transports] is a *candidate priority list*, not a promise: the
+ * session probes each candidate at connect time and keeps the first one that answers. The
+ * official app does the same — `BluetoothConnectionHandler.resolveBluetoothType()` reads a
+ * per-device `transportType` at connection time rather than consulting a compiled model table.
+ */
+enum class PodTransport {
+    /** GAIA over BLE GATT (`00001100-d102-11e1-9b23-00025b00a5a5` service). */
+    BLE_GAIA,
 
-/** Data-driven [DeviceProfile]: every model-specific fact is a constructor argument. */
+    /** GAIA over Classic RFCOMM/SPP (`00001101-0000-1000-8000-00805f9b34fb`). */
+    RFCOMM_GAIA,
+
+    /** Vendor "audio source switch" protocol over BLE (`9ECA0000-...`, 4-byte `A5 01 id len` frames). */
+    BLE_SRC_9ECA,
+}
+
+/**
+ * The capability features a model is *declared* to have.
+ *
+ * These are hints authored from evidence about the product, and they are what the UI shows before
+ * the earbud has said anything. At runtime `ObservedFeatures` can only add to them, never remove
+ * (see [DeviceRegistry.applyObservedFeatures]).
+ */
+data class DeclaredFeatures(
+    val adaptive: Boolean = false,
+    val spatialAudio: Boolean = false,
+    val spatialSoundSwitch: Boolean = false,
+    val gain: Boolean = false,
+    val led: Boolean = false,
+    val headTracking: Boolean = false,
+    val promptTone: Boolean = false,
+    val promptVolume: Boolean = false,
+    val lhdc: Boolean = false,
+    val dualConnection: Boolean = false,
+    /** Overrides the form-factor default; null means "derive from [DeviceFormFactor]". */
+    val singleDeviceBattery: Boolean? = null,
+    /**
+     * Which of the control profile's ANC modes this product actually exposes as tabs, in UI
+     * order. Null means "all of them".
+     *
+     * The two are not the same thing: PUDDING's firmware accepts five wire values but its product
+     * UI offers three tabs (basic / adaptive / anti-wind), so the wire vocabulary stays complete
+     * while the picker stays short.
+     */
+    val ancTabs: List<NoiseControlMode>? = null,
+) {
+    companion object {
+        /** Nothing declared: the UI starts empty and probing fills it in. */
+        val NONE = DeclaredFeatures()
+    }
+}
+
+/**
+ * Data-driven [DeviceProfile]: identity, shape and wire vocabulary are separate arguments.
+ *
+ * [capabilities] is derived from [control] + [formFactor] + [declared], so there is exactly one
+ * place each fact can live. Changing an ANC wire value means editing a [ControlProfile], not
+ * every model that speaks it.
+ */
 data class DeviceProfileSpec(
     override val id: String,
     override val displayName: String,
@@ -21,22 +75,40 @@ data class DeviceProfileSpec(
     override val note: String,
     override val imageKey: String,
     override val transports: List<PodTransport>,
-    override val capabilities: DeviceCapabilities,
-    override val commandTable: GaiaCommandTable,
+    override val control: ControlProfile = ControlProfiles.probeFallback,
+    override val formFactor: DeviceFormFactor = DeviceFormFactor.TWS,
+    val declared: DeclaredFeatures = DeclaredFeatures.NONE,
 ) : DeviceProfile {
+
+    override val commandTable: GaiaCommandTable get() = control.table
+
+    override val capabilities: DeviceCapabilities by lazy {
+        DeviceModels.buildCapabilities(
+            control = control,
+            formFactor = formFactor,
+            declared = declared,
+        )
+    }
+
     override fun matches(name: String?): Boolean = DeviceModels.nameMatches(name, aliases)
 }
 
 /**
- * Central model registry inspired by MiuixMoondrop: one declarative record per model,
- * alias-based matching, a verified/inferred flag, and a conservative fallback.
+ * Central model registry: one declarative record per model.
  *
- * Only PUDDING and MIRAGE are flagged [DeviceProfile.verified] real-hardware; every other
- * record is protocol-inferred (best-effort GAIA constants, silent degrade on failure).
+ * Each record names its [ControlProfile] and [DeviceFormFactor] instead of restating a whole
+ * capability block. Models that speak the same dialect share a control profile — MOONDROP MIRAGE
+ * (海市蜃楼) is a PUDDING variant and points at `ControlProfiles.pudding` — so a wire fix lands in
+ * one place.
+ *
+ * Only PUDDING and MIRAGE are [DeviceProfile.verified] real hardware. Everything else keeps its
+ * own identity record (so the name is recognised and the right art is drawn) but starts from
+ * `ControlProfiles.probeFallback` with no declared features, letting `GET_SUPPORTED_FEATURES`
+ * decide what the UI offers. Guessing a mapping per model is exactly what this replaces.
  */
 object DeviceModels {
 
-    // ---- Reusable ANC / gain descriptors ------------------------------------------
+    // ---- Capability derivation -----------------------------------------------------
 
     private fun labelFor(mode: NoiseControlMode): Int = when (mode) {
         NoiseControlMode.OFF -> R.string.off
@@ -47,7 +119,7 @@ object DeviceModels {
         else -> R.string.noise_cancellation_title
     }
 
-    private fun uiStatus(mode: NoiseControlMode): Int = when (mode) {
+    internal fun uiStatus(mode: NoiseControlMode): Int = when (mode) {
         NoiseControlMode.OFF -> 1
         NoiseControlMode.NOISE_CANCELLATION -> 2
         NoiseControlMode.TRANSPARENCY -> 3
@@ -58,108 +130,75 @@ object DeviceModels {
         NoiseControlMode.NOISE_CANCELLATION_DEEP -> 8
     }
 
+    private fun ancOptions(control: ControlProfile, declared: DeclaredFeatures): List<AncModeOption> {
+        val modes = declared.ancTabs ?: control.ancPairs.map { it.first }
+        return modes.map { mode -> AncModeOption(mode, labelFor(mode)) }
+    }
+
     /**
-     * Build (setMap indexed by uiStatus 1..8, getMap indexed by reported value).
-     * For AUDIO_CURATION, GET reports a 0-based index while SET takes a command byte,
-     * so [getSequential] makes getMap key on the 0-based position instead of the wire byte.
+     * The single place capabilities are assembled.
+     *
+     * [DeviceCapabilities]' `ancPath` / `ancSetMap` / `ancGetMap` / `gainMap` are filled from
+     * [control], so the fields the UI reads and the fields the command table uses cannot diverge.
      */
-    private fun ancMaps(
-        pairs: List<Pair<NoiseControlMode, Int>>,
-        getSequential: Boolean = false,
-    ): Pair<IntArray, IntArray> {
-        val setMap = IntArray(9) { -1 }
-        val getMap = IntArray(16) { -1 }
-        pairs.forEachIndexed { index, (mode, wire) ->
-            val ui = uiStatus(mode)
-            if (ui in 1..8) setMap[ui] = wire
-            val getWire = if (getSequential) index else wire
-            if (getWire in 0..15) getMap[getWire] = ui
-        }
-        return setMap to getMap
-    }
-
-    private fun ancOptions(modes: List<NoiseControlMode>) =
-        modes.map { AncModeOption(it, labelFor(it)) }
-
-    // ANC descriptors: UI modes paired with their SET wire values.
-    private val ac3Pairs = listOf(
-        NoiseControlMode.OFF to 1,
-        NoiseControlMode.NOISE_CANCELLATION to 2,
-        NoiseControlMode.TRANSPARENCY to 4,
-    )
-    private val ac4Pairs = listOf(
-        NoiseControlMode.OFF to 1,
-        NoiseControlMode.NOISE_CANCELLATION to 2,
-        NoiseControlMode.TRANSPARENCY to 4,
-        NoiseControlMode.NOISE_CANCELLATION_SMART to 3,
-    )
-
-    private val gainIdentity = intArrayOf(0, 1, 2)
-    private val gainReversed = intArrayOf(2, 1, 0)
-    private val gainLabels = listOf("Low", "Medium", "High")
-
-    /** Most conservative capability set for a model with no real-hardware evidence. */
-    private val conservativeCaps: DeviceCapabilities
-        get() = inferredCaps(ac4Pairs, gain = null)
-
-    private fun inferredCaps(
-        pairs: List<Pair<NoiseControlMode, Int>>,
-        path: AncPathKind = AncPathKind.AUDIO_CURATION,
-        gain: IntArray? = null,
-        led: Boolean = false,
-        spatial: Boolean = false,
-        headTracking: Boolean = false,
-        promptTone: Boolean = false,
-        lhdc: Boolean = false,
-        dualConnection: Boolean = false,
-        singleDeviceBattery: Boolean = false,
-    ): DeviceCapabilities {
-        val (setMap, getMap) = ancMaps(pairs, getSequential = path == AncPathKind.AUDIO_CURATION)
-        return DeviceCapabilities(
-            adaptiveSupported = false,
-            spatialAudioSupported = spatial,
-            spatialSoundSwitchSupported = spatial,
-            ancImplementation = AncImplementation.STANDARD,
-            ancModes = ancOptions(pairs.map { it.first }),
-            ancPath = path,
-            ancSetMap = setMap,
-            ancGetMap = getMap,
-            gainSupported = gain != null,
-            gainMap = gain ?: gainIdentity,
-            gainLabels = if (gain != null) gainLabels else emptyList(),
-            ledSupported = led,
-            headTrackingSupported = headTracking,
-            promptToneSupported = promptTone,
-            promptVolumeSupported = promptTone,
-            lhdcSupported = lhdc,
-            dualConnectionSupported = dualConnection,
-            singleDeviceBattery = singleDeviceBattery,
-        )
-    }
-
-    private fun genericTable(caps: DeviceCapabilities) = GenericGaiaCommandTable(
-        ancPathKind = caps.ancPath,
-        ancSetMap = caps.ancSetMap,
-        ancGetMap = caps.ancGetMap ?: caps.ancSetMap,
-        gainMap = caps.gainMap,
+    internal fun buildCapabilities(
+        control: ControlProfile,
+        formFactor: DeviceFormFactor,
+        declared: DeclaredFeatures,
+    ): DeviceCapabilities = DeviceCapabilities(
+        adaptiveSupported = declared.adaptive,
+        spatialAudioSupported = declared.spatialAudio,
+        spatialSoundSwitchSupported = declared.spatialSoundSwitch,
+        ancImplementation = AncImplementation.STANDARD,
+        ancModes = ancOptions(control, declared),
+        ancPath = control.ancPath,
+        ancSetMap = control.ancSetMap,
+        ancGetMap = control.ancGetMap,
+        gainSupported = declared.gain && control.hasGain,
+        // The mapping comes from the vocabulary and may be an unconfirmed assumption; what keeps
+        // an unconfirmed mapping from showing a control is `declared.gain` above, not an empty
+        // array. Keeping the mapping present is what lets applyObservedFeatures open the control
+        // when the device reports DAC_GAIN.
+        gainMap = control.gainMap,
+        // Labels follow the mapping, not the declaration: the picker is gated on gainSupported,
+        // so keeping the two lists the same length is what stops the UI offering a step the
+        // vocabulary cannot address after probing opens the control.
+        gainLabels = if (control.hasGain) GAIN_LABELS else emptyList(),
+        ledSupported = declared.led,
+        headTrackingSupported = declared.headTracking,
+        promptToneSupported = declared.promptTone,
+        promptVolumeSupported = declared.promptVolume,
+        lhdcSupported = declared.lhdc,
+        dualConnectionSupported = declared.dualConnection,
+        singleDeviceBattery = declared.singleDeviceBattery ?: formFactor.singleBatteryByDefault,
     )
 
+    private val GAIN_LABELS = listOf("Low", "Medium", "High")
+
+    // ---- Record constructors -------------------------------------------------------
+
+    /**
+     * A model recognised by name but **without** verified wire behaviour.
+     *
+     * No declared features: the point is that a name match alone is not evidence that a given
+     * control exists, so the UI waits for `GET_SUPPORTED_FEATURES` instead of guessing.
+     */
     private fun inferred(
         id: String,
         displayName: String,
         aliases: List<String>,
-        caps: DeviceCapabilities = conservativeCaps,
         imageKey: String = id,
+        formFactor: DeviceFormFactor = DeviceFormFactor.TWS,
     ) = DeviceProfileSpec(
         id = id,
         displayName = displayName,
         aliases = aliases,
         verified = false,
-        note = "Protocol inferred — not verified on real hardware",
+        note = "Protocol inferred — capabilities come from runtime probing",
         imageKey = imageKey,
         transports = listOf(PodTransport.RFCOMM_GAIA),
-        capabilities = caps,
-        commandTable = genericTable(caps),
+        control = ControlProfiles.probeFallback,
+        formFactor = formFactor,
     )
 
     // ---- Verified models -----------------------------------------------------------
@@ -172,32 +211,26 @@ object DeviceModels {
         note = "Verified on real hardware (PuddingPods)",
         imageKey = "moondrop_pudding",
         transports = listOf(PodTransport.RFCOMM_GAIA),
-        capabilities = DeviceCapabilities(
-            adaptiveSupported = true,
-            spatialAudioSupported = false,
-            spatialSoundSwitchSupported = false,
-            ancImplementation = AncImplementation.STANDARD,
-            ancModes = listOf(
-                AncModeOption(NoiseControlMode.NOISE_CANCELLATION, R.string.pudding_anc_basic),
-                AncModeOption(NoiseControlMode.ADAPTIVE, R.string.pudding_anc_adaptive),
-                AncModeOption(NoiseControlMode.NOISE_CANCELLATION_SMART, R.string.pudding_anc_wind),
+        control = ControlProfiles.pudding,
+        formFactor = DeviceFormFactor.TWS,
+        declared = DeclaredFeatures(
+            adaptive = true,
+            gain = true,
+            led = true,
+            promptTone = true,
+            promptVolume = true,
+            lhdc = true,
+            dualConnection = true,
+            // The firmware takes five wire values, but the product only exposes these three tabs.
+            ancTabs = listOf(
+                NoiseControlMode.NOISE_CANCELLATION,
+                NoiseControlMode.ADAPTIVE,
+                NoiseControlMode.NOISE_CANCELLATION_SMART,
             ),
-            ancPath = AncPathKind.ANC_V2,
-            ancSetMap = intArrayOf(-1, 0, 1, 2, 4, 3, -1, -1, -1),
-            ancGetMap = intArrayOf(1, 2, 3, 5, 4, -1),
-            gainSupported = true,
-            gainMap = gainReversed,
-            gainLabels = gainLabels,
-            ledSupported = true,
-            promptToneSupported = true,
-            promptVolumeSupported = true,
-            lhdcSupported = true,
-            dualConnectionSupported = true,
         ),
-        commandTable = PuddingCommandTable,
     )
 
-    /** Mirage (海市蜃楼) — the PUDDING-linked variant; same verified wire protocol. */
+    /** Mirage (海市蜃楼) — the PUDDING-linked variant; same electronics, same control profile. */
     val mirage = DeviceProfileSpec(
         id = "mirage",
         displayName = "MOONDROP MIRAGE / 海市蜃楼",
@@ -206,78 +239,85 @@ object DeviceModels {
         note = "Verified on real hardware (PUDDING-linked variant)",
         imageKey = "moondrop_mirage",
         transports = listOf(PodTransport.RFCOMM_GAIA),
-        capabilities = pudding.capabilities,
-        commandTable = PuddingCommandTable,
+        control = ControlProfiles.pudding,
+        formFactor = DeviceFormFactor.TWS,
+        declared = pudding.declared,
     )
 
-    // ---- Protocol-inferred models (45 total: 2 verified + 43 inferred) ------------
-    // The first 15 keep their historical ids/aliases/capabilities for matching
-    // compatibility; imageKey is the asset slug. The remaining 28 are newly added
-    // models with conservative capabilities and name-based aliases.
+    // ---- Name-recognised models ----------------------------------------------------
+    // Identity records only: they exist so the model is recognised and drawn correctly. Wire
+    // behaviour and capabilities come from the control profile plus runtime probing.
 
     val models: List<DeviceProfile> = listOf(
         pudding,
         mirage,
-        inferred("bianca_stigmata", "BIANCA:STIGMATA", listOf("biancastigmata", "bianca", "stigmata"), conservativeCaps, "bianca_stigmata"),
-        inferred("h_i_d_e_404_klukai", "H.I.D.E.404_Klukai", listOf("404klukai", "klukai"), conservativeCaps, "h_i_d_e_404_klukai"),
-        inferred("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), conservativeCaps, "laplace_oba"),
-        inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), conservativeCaps, "me_163_komet_moca"),
-        inferred("alice", "MOONDROP Alice", listOf("alice"), inferredCaps(ac4Pairs), "moondrop_alice"),
-        inferred("moondrop_dots", "MOONDROP Dots", listOf("MOONDROP Dots"), conservativeCaps, "moondrop_dots"),
-        inferred("edge", "MOONDROP EDGE", listOf("edge"), inferredCaps(ac3Pairs, gain = gainIdentity, singleDeviceBattery = true), "moondrop_edge"),
-        inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), inferredCaps(ac3Pairs, gain = gainIdentity), "moondrop_edge_2"),
-        inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), conservativeCaps, "moondrop_evo_2"),
-        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), inferredCaps(ac4Pairs, gain = gainReversed), "moondrop_golden_ages"),
-        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), inferredCaps(ac4Pairs, gain = gainReversed, promptTone = true), "moondrop_golden_ages_2"),
-        inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), conservativeCaps, "moondrop_littlewhite"),
-        inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), conservativeCaps, "moondrop_mm3a"),
-        inferred("maca", "MOONDROP MACA", listOf("maca"), inferredCaps(ac4Pairs, lhdc = true, spatial = true), "moondrop_moca"),
-        inferred("moondrop_moon_travel", "MOONDROP MOON TRAVEL", listOf("moontravel", "travel"), conservativeCaps, "moondrop_moon_travel"),
-        inferred("nekocake", "MOONDROP NEKOCAKE", listOf("nekocake", "neko"), inferredCaps(ac4Pairs, lhdc = true), "moondrop_nekocake"),
-        inferred("moondrop_nekocake_acht_acht_limited", "Moondrop Nekocake Acht Acht Limited", listOf("nekocakeachtacht", "nekocake"), conservativeCaps, "moondrop_nekocake_acht_acht_limited"),
-        inferred("moondrop_nekocake_qbz_191", "Moondrop Nekocake QBZ-191", listOf("nekocakeqbz191", "nekocake"), conservativeCaps, "moondrop_nekocake_qbz_191"),
-        inferred("pills", "MOONDROP PILLS", listOf("pills"), inferredCaps(ac4Pairs), "moondrop_pill"),
-        inferred("moondrop_punishing_gray_raven", "Moondrop PUNISHING;GRAY RAVEN IOS", listOf("punishinggrayraven", "punishing", "raven"), conservativeCaps, "moondrop_punishing_gray_raven"),
-        inferred("space_travel", "MOONDROP Space Travel", listOf("spacetravel"), inferredCaps(ac4Pairs), "moondrop_space_travel"),
-        inferred("sparks", "MOONDROP SPARKS", listOf("sparks"), inferredCaps(ac4Pairs), "moondrop_sparks"),
-        inferred("moondrop_sparxie", "MOONDROP Sparxie", listOf("sparxie"), conservativeCaps, "moondrop_sparxie"),
-        inferred("moondrop_susanoo_tws", "Moondrop SUSANOO TWS IOS", listOf("susanoo"), conservativeCaps, "moondrop_susanoo_tws"),
-        inferred("moondrop_the_garden", "MOONDROP The Garden", listOf("garden"), conservativeCaps, "moondrop_the_garden"),
-        inferred("moondrop_u_c_t_s", "Moondrop U.C.T.S.", listOf("Moondrop U.C.T.S."), conservativeCaps, "moondrop_u_c_t_s"),
-        inferred("moondrop_ultrasonic", "MOONDROP Ultrasonic", listOf("ultrasonic"), conservativeCaps, "moondrop_ultrasonic"),
-        inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"), inferredCaps(ac4Pairs), "moondrop_voyager"),
-        inferred("moondrop_x_yasuno_kiyono", "MOONDROP x YASUNO KIYONO", listOf("yasunokiyono", "yasuno", "kiyono"), conservativeCaps, "moondrop_x_yasuno_kiyono"),
-        inferred("nicole_reeyn", "Nicole Reeyn", listOf("nicolereeyn", "nicole", "reeyn"), conservativeCaps, "nicole_reeyn"),
-        inferred("pandaer_open_air_pill", "PANDAER Open Air Pill", listOf("openairpill"), conservativeCaps, "pandaer_open_air_pill"),
-        inferred("pandaer_space_travel_2", "PANDAER Space Travel 2", listOf("spacetravel", "space", "travel"), conservativeCaps, "pandaer_space_travel_2"),
-        inferred("pill_gotoh_hitori", "Pill Gotoh Hitori", listOf("pillgotohhitori", "gotoh", "hitori"), conservativeCaps, "pill_gotoh_hitori"),
-        inferred("pill_ijichi_nijika", "Pill Ijichi Nijika", listOf("pillijichinijika", "ijichi", "nijika"), conservativeCaps, "pill_ijichi_nijika"),
-        inferred("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "ikuyo"), conservativeCaps, "pill_kita_ikuyo"),
-        inferred("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada"), conservativeCaps, "pill_yamada_ryo"),
-        inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), conservativeCaps, "punishing_gray_raven"),
-        inferred("robins", "MOONDROP robins", listOf("robins", "robin"), inferredCaps(ac4Pairs), "robin_s_earphones"),
-        inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), conservativeCaps, "space_force"),
-        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), inferredCaps(ac4Pairs, gain = gainReversed, spatial = true), "space_travel_2"),
-        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), inferredCaps(ac4Pairs, gain = gainReversed, spatial = true), "space_travel_2_ultra"),
-        inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), conservativeCaps, "susanoo_tws"),
-        inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), conservativeCaps, "zzz_angels_ows"),
+        inferred("bianca_stigmata", "BIANCA:STIGMATA", listOf("biancastigmata", "bianca", "stigmata"), "bianca_stigmata", DeviceFormFactor.HEADPHONES),
+        inferred("h_i_d_e_404_klukai", "H.I.D.E.404_Klukai", listOf("404klukai", "klukai"), "h_i_d_e_404_klukai"),
+        inferred("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), "laplace_oba"),
+        inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), "me_163_komet_moca"),
+        inferred("alice", "MOONDROP Alice", listOf("alice"), "moondrop_alice"),
+        inferred("moondrop_dots", "MOONDROP Dots", listOf("MOONDROP Dots"), "moondrop_dots"),
+        inferred("edge", "MOONDROP EDGE", listOf("edge"), "moondrop_edge"),
+        inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), "moondrop_edge_2"),
+        inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), "moondrop_evo_2"),
+        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages"),
+        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2"),
+        inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), "moondrop_littlewhite", DeviceFormFactor.ONE_PIECE),
+        inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), "moondrop_mm3a", DeviceFormFactor.SPEAKER),
+        inferred("maca", "MOONDROP MACA", listOf("maca"), "moondrop_moca"),
+        inferred("moondrop_moon_travel", "MOONDROP MOON TRAVEL", listOf("moontravel", "travel"), "moondrop_moon_travel"),
+        inferred("nekocake", "MOONDROP NEKOCAKE", listOf("nekocake", "neko"), "moondrop_nekocake"),
+        inferred("moondrop_nekocake_acht_acht_limited", "Moondrop Nekocake Acht Acht Limited", listOf("nekocakeachtacht", "nekocake"), "moondrop_nekocake_acht_acht_limited"),
+        inferred("moondrop_nekocake_qbz_191", "Moondrop Nekocake QBZ-191", listOf("nekocakeqbz191", "nekocake"), "moondrop_nekocake_qbz_191"),
+        inferred("pills", "MOONDROP PILLS", listOf("pills"), "moondrop_pill"),
+        inferred("moondrop_punishing_gray_raven", "Moondrop PUNISHING;GRAY RAVEN IOS", listOf("punishinggrayraven", "punishing", "raven"), "moondrop_punishing_gray_raven"),
+        inferred("sparks", "MOONDROP SPARKS", listOf("sparks"), "moondrop_sparks"),
+        inferred("moondrop_sparxie", "MOONDROP Sparxie", listOf("sparxie"), "moondrop_sparxie"),
+        // "susanoo" alone is ambiguous between these two; see byAlias ordering note below.
+        inferred("moondrop_susanoo_tws", "Moondrop SUSANOO TWS IOS", listOf("susanootwsios"), "moondrop_susanoo_tws"),
+        inferred("moondrop_the_garden", "MOONDROP The Garden", listOf("garden"), "moondrop_the_garden"),
+        inferred("moondrop_u_c_t_s", "Moondrop U.C.T.S.", listOf("Moondrop U.C.T.S."), "moondrop_u_c_t_s"),
+        inferred("moondrop_ultrasonic", "MOONDROP Ultrasonic", listOf("ultrasonic"), "moondrop_ultrasonic"),
+        inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"), "moondrop_voyager", DeviceFormFactor.ONE_PIECE),
+        inferred("moondrop_x_yasuno_kiyono", "MOONDROP x YASUNO KIYONO", listOf("yasunokiyono", "yasuno", "kiyono"), "moondrop_x_yasuno_kiyono"),
+        inferred("nicole_reeyn", "Nicole Reeyn", listOf("nicolereeyn", "nicole", "reeyn"), "nicole_reeyn", DeviceFormFactor.ONE_PIECE),
+        inferred("pandaer_open_air_pill", "PANDAER Open Air Pill", listOf("openairpill"), "pandaer_open_air_pill"),
+        inferred("pandaer_space_travel_2", "PANDAER Space Travel 2", listOf("spacetravel", "space", "travel"), "pandaer_space_travel_2"),
+        inferred("pill_gotoh_hitori", "Pill Gotoh Hitori", listOf("pillgotohhitori", "gotoh", "hitori"), "pill_gotoh_hitori"),
+        inferred("pill_ijichi_nijika", "Pill Ijichi Nijika", listOf("pillijichinijika", "ijichi", "nijika"), "pill_ijichi_nijika"),
+        inferred("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "ikuyo"), "pill_kita_ikuyo"),
+        inferred("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada"), "pill_yamada_ryo"),
+        inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), "punishing_gray_raven"),
+        inferred("robins", "MOONDROP robins", listOf("robins", "robin"), "robin_s_earphones"),
+        inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
+        inferred("space_travel", "MOONDROP Space Travel", listOf("spacetravel"), "moondrop_space_travel"),
+        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2"),
+        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra"),
+        inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), "susanoo_tws"),
+        inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), "zzz_angels_ows"),
     )
 
     val byAlias: List<Pair<String, DeviceProfile>> = models
         .flatMap { model -> model.aliases.map { normalize(it) to model } }
         .sortedByDescending { it.first.length }
 
-    /** Conservative fallback for an unmatched MOONDROP / 水月雨 name. */
+    /**
+     * Model-aware fallback for a MOONDROP / 水月雨 name no record owns.
+     *
+     * This is a real fallback, not a refusal: it keeps the generic GAIA vocabulary so a brand-new
+     * model can still be probed and driven, it just declares nothing and shows nothing until the
+     * earbud answers `GET_SUPPORTED_FEATURES`.
+     */
     val fallback = DeviceProfileSpec(
         id = "fallback",
-        displayName = "MOONDROP (inferred)",
+        displayName = "MOONDROP (unrecognised model)",
         aliases = emptyList(),
         verified = false,
-        note = "Unrecognised MOONDROP model — commands use conservative guessed constants",
+        note = "Unrecognised MOONDROP model — features are discovered by probing",
         imageKey = "default",
         transports = listOf(PodTransport.RFCOMM_GAIA),
-        capabilities = inferredCaps(ac4Pairs, gain = null),
-        commandTable = NoOpGaiaCommandTable,
+        control = ControlProfiles.probeFallback,
+        formFactor = DeviceFormFactor.TWS,
     )
 
     fun normalize(name: String?): String = name.orEmpty().lowercase()
@@ -289,7 +329,7 @@ object DeviceModels {
         return aliases.any { alias -> n.contains(normalize(alias)) }
     }
 
-    /** Alias-first, then conservative fallback for MOONDROP-branded names. */
+    /** Alias-first, then the probe-only fallback for MOONDROP-branded names. */
     fun match(name: String?): DeviceProfile? {
         val n = normalize(name)
         if (n.isEmpty()) return null

@@ -1,4 +1,4 @@
-﻿package cythen.hyperdrop.pods
+package cythen.hyperdrop.pods
 
 import android.content.Context
 import android.content.Intent
@@ -183,7 +183,8 @@ object VirtualDeviceSession {
     private fun resetState(resolvedProfile: DeviceProfile) {
         val capabilities = resolvedProfile.capabilities
         currentAnc = capabilities.ancModes.firstOrNull()?.mode?.toUiStatus() ?: 1
-        currentGainLevel = if (capabilities.gainMap.isEmpty()) 0 else min(1, capabilities.gainMap.size - 1)
+        // Simulated devices have no probing, so a control the profile does not declare is off.
+        currentGainLevel = if (!capabilities.gainSupported) 0 else min(1, capabilities.gainMap.size - 1)
         currentLedEnabled = capabilities.ledSupported
         currentPromptToneEnabled = false
         currentPromptVolume = 50

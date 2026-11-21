@@ -45,7 +45,21 @@ interface GaiaCommandTable {
     /** GAIA feature that carries ANC. Default: ANC_V2. */
     val ancPath: AncPathKind get() = AncPathKind.ANC_V2
 
+    /**
+     * This table re-aimed at a different ANC feature, or `this` when the table is fixed.
+     *
+     * Used after `GET_SUPPORTED_FEATURES` shows that the device answers ANC on another path:
+     * the profile's translation tables stay as they are, only the carrier feature changes.
+     */
+    fun withAncPath(path: AncPathKind): GaiaCommandTable = this
+
     val querySupportedFeatures: ByteArray? get() = null
+
+    /**
+     * "Next page of supported features" request, sent when the previous page reported
+     * `hasMoreData`. Official: `V3BasicPlugin$COMMANDS.V1_GET_SUPPORTED_FEATURES_NEXT = 0x02`.
+     */
+    val querySupportedFeaturesNext: ByteArray? get() = null
     val querySpatialAudio: ByteArray? get() = null
     val queryHeadTracking: ByteArray? get() = null
     val queryVoiceConfig: ByteArray? get() = null

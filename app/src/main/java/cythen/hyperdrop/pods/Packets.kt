@@ -313,6 +313,12 @@ object Enums {
  * Payload consists of pairs: [Index(1B), RawValue(1B)]
  *   Index: 1=Left, 2=Right, 3=Case
  *   RawValue: battery = value & 0x7F, charging = (value & 0x80) != 0
+ *
+ * This 0x80 charging bit belongs to the **legacy OPPO AA protocol only**. Qualcomm GAIA
+ * battery records are `[batteryId, level]` with `level == 0xFF` meaning unknown and no
+ * charging flag at all (`BatteryLevel.smali:17-21` in the official APK). Never feed a GAIA
+ * payload through this parser — use
+ * [cythen.hyperdrop.device.protocol.GaiaBatteryParser] instead.
  */
 object BatteryParser {
 

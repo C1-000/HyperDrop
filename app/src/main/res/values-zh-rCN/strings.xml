@@ -164,6 +164,12 @@
     <string name="device_adaptation_summary">已适配机型与验证状态</string>
     <string name="adaptation_verified">实机验证</string>
     <string name="adaptation_inferred">协议推断（未实机验证）</string>
+    <string name="adaptation_control_profile">控制档案：%1$s</string>
+    <string name="form_factor_tws">真无线耳机</string>
+    <string name="form_factor_one_piece">一体式</string>
+    <string name="form_factor_headphones">头戴式</string>
+    <string name="form_factor_speaker">音箱</string>
+    <string name="form_factor_wired_dongle">有线 / 小尾巴</string>
 
     <string name="pudding_anc_basic">基础</string>
     <string name="pudding_anc_adaptive">自适应</string>

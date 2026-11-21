@@ -48,6 +48,25 @@ object GaiaTransport {
     fun v4(payload: ByteArray): ByteArray = frame(PROTOCOL_V4, payload)
 
     /**
+     * Removes an RFCOMM framing header, yielding the bare GAIA packet.
+     *
+     * GAIA-over-BLE carries the packet verbatim, so the v1 negotiation frame built for RFCOMM
+     * must lose its `FF <ver> <flags> <len>` prefix before a GATT write. A buffer that is not
+     * framed is returned unchanged, which keeps this safe to call on already-bare input.
+     *
+     * Only short frames are handled: the length is not needed to strip a fixed 4-byte header,
+     * and an extended-length frame would need its own 5-byte prefix.
+     */
+    fun stripFrame(frame: ByteArray): ByteArray {
+        if (frame.size <= COMMAND_HEADER_SIZE) return frame
+        if ((frame[0].toInt() and 0xFF) != SOF) return frame
+        val flags = frame[2].toInt() and 0xFF
+        val headerSize = if (flags and FLAG_LENGTH_EXTENSION != 0) 5 else 4
+        if (frame.size <= headerSize) return frame
+        return frame.copyOfRange(headerSize, frame.size)
+    }
+
+    /**
      * Stateful RFCOMM stream decoder. InputStream reads may split or merge GAIA frames.
      * Traffic observed so far uses short, no-checksum frames; checksum and extended
      * length are supported here as well for robustness.
