@@ -38,8 +38,10 @@ jobs:
         with:
           name: unit-test-report
           path: app/build/reports/tests/testDebugUnitTest
-          archive: false
+          # A report is a directory of files, so it must be archived; `archive: false`
+          # only accepts a single file and failed the job once unit tests went green.
           if-no-files-found: ignore
+          overwrite: true
 
       - name: Build release APK
         run: ./gradlew :app:assembleRelease
