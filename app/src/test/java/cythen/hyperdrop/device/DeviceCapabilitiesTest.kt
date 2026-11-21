@@ -125,11 +125,11 @@ class DeviceCapabilitiesTest {
         val edge = DeviceRegistry.profileById("edge")
         assertTrue(edge.capabilities.gainSupported)
         assertEquals(3, edge.capabilities.ancModes.size)
-        // Pudding ANC set table is indexed by UI status 1..5.
-        val pudding = DeviceModels.pudding.capabilities
-        assertEquals(0, pudding.ancSetMap[1])  // UI status 1 = OFF -> wire 0
-        assertEquals(4, pudding.ancSetMap[4])  // ADAPTIVE -> wire 4
-        assertEquals(3, pudding.ancSetMap[5])  // WIND_REDUCTION -> wire 3
+        // Wire maps now live in the control profile, not capabilities.
+        val puddingControl = DeviceModels.pudding.controlProfile
+        assertEquals(0, puddingControl.ancSetMap[1])  // UI status 1 = OFF -> wire 0
+        assertEquals(4, puddingControl.ancSetMap[4])  // ADAPTIVE -> wire 4
+        assertEquals(3, puddingControl.ancSetMap[5])  // WIND_REDUCTION -> wire 3
     }
 
     @Test
@@ -166,5 +166,45 @@ class DeviceCapabilitiesTest {
             DeviceImageCatalog.DEFAULT,
             DeviceImageCatalog.resolve("definitely_not_a_model"),
         )
+    }
+
+    @Test
+    fun `control and capability archives are shared across models`() {
+        // MIRAGE reuses both PUDDING archives verbatim — no duplicated capability block.
+        assertTrue(DeviceModels.mirage.controlProfile === DeviceModels.pudding.controlProfile)
+        assertTrue(DeviceModels.mirage.capabilityProfile === DeviceModels.pudding.capabilityProfile)
+        // Wire maps live only in the control archive, never in capabilities.
+        assertEquals(0, DeviceModels.pudding.controlProfile.ancSetMap[1])
+    }
+
+    @Test
+    fun `one-piece models declare single device battery form`() {
+        assertEquals(BatteryForm.SINGLE_DEVICE, DeviceRegistry.profileById("edge").capabilities.batteryForm)
+        assertEquals(BatteryForm.SINGLE_DEVICE, DeviceRegistry.profileById("bianca_stigmata").capabilities.batteryForm)
+        assertEquals(BatteryForm.TWS_THREE_WAY, DeviceModels.pudding.capabilities.batteryForm)
+    }
+
+    @Test
+    fun `observation only opens capabilities and declaration wins on conflict`() {
+        val declared = DeviceCapabilities.NONE.copy(adaptiveSupported = true, lhdcSupported = true)
+        val observed = DeviceRegistry.resolveCapabilities(
+            declared,
+            setOf(CapabilityProfile.F_LED, CapabilityProfile.F_VOICE, CapabilityProfile.F_CODEC_TYPE),
+        )
+        // Declared true stays; declared false + observed bit opens.
+        assertTrue(observed.adaptiveSupported)
+        assertTrue(observed.lhdcSupported)
+        assertTrue(observed.ledSupported)
+        assertTrue(observed.promptToneSupported)
+        assertTrue(observed.promptVolumeSupported)
+        // No observed bit for spatial → stays closed.
+        assertFalse(observed.spatialAudioSupported)
+    }
+
+    @Test
+    fun `layer two fallback probes and is used only for moondrop names`() {
+        assertTrue(DeviceRegistry.shouldProbeOnConnect("MOONDROP something unknown"))
+        assertFalse(DeviceRegistry.shouldProbeOnConnect("Sony XM5"))
+        assertTrue(DeviceRegistry.profileFor("MOONDROP something unknown").note.contains("Unrecognised"))
     }
 }

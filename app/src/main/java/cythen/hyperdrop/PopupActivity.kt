@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.ancModeFromUiStatus
 import cythen.hyperdrop.pods.toUiStatus
+import cythen.hyperdrop.device.BatteryForm
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.AncModeOption
 import cythen.hyperdrop.config.ConfigManager
@@ -288,7 +289,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onMore = onMore,
                     onDone = { showDialog.value = false },
                     ancModes = capabilities.ancModes,
-                    controlsEnabled = !controlsYielded.value
+                    controlsEnabled = !controlsYielded.value,
+                    batteryForm = capabilities.batteryForm
                 )
             } else {
                 PortraitPopupBody(
@@ -300,7 +302,8 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                     onMore = onMore,
                     onDone = { showDialog.value = false },
                     ancModes = capabilities.ancModes,
-                    controlsEnabled = !controlsYielded.value
+                    controlsEnabled = !controlsYielded.value,
+                    batteryForm = capabilities.batteryForm
                 )
             }
         }
@@ -317,12 +320,14 @@ private fun PortraitPopupBody(
     onMore: () -> Unit,
     onDone: () -> Unit,
     ancModes: List<AncModeOption> = emptyList(),
-    controlsEnabled: Boolean = true
+    controlsEnabled: Boolean = true,
+    batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Card(modifier = Modifier.fillMaxWidth()) {
             PodStatus(
                 batteryParams,
+                batteryForm = batteryForm,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
             )
         }
@@ -374,7 +379,8 @@ private fun LandscapePopupBody(
     onMore: () -> Unit,
     onDone: () -> Unit,
     ancModes: List<AncModeOption> = emptyList(),
-    controlsEnabled: Boolean = true
+    controlsEnabled: Boolean = true,
+    batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY
 ) {
     Row(
         modifier = Modifier
@@ -392,6 +398,7 @@ private fun LandscapePopupBody(
             Card(modifier = Modifier.fillMaxWidth()) {
                 PodStatus(
                     batteryParams,
+                    batteryForm = batteryForm,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                     compact = true
                 )

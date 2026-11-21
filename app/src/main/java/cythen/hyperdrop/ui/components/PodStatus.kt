@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cythen.hyperdrop.R
+import cythen.hyperdrop.device.BatteryForm
 import cythen.hyperdrop.pods.WearState
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -45,8 +46,11 @@ fun PodStatus(
     batteryParams: BatteryParams,
     wearStatus: WearStatus = WearStatus(),
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY,
 ) {
+    if (batteryForm == BatteryForm.NONE) return
+
     val dividerColor = if (isSystemInDarkTheme()) Color(0xFF333333) else Color(0xFFEEEEEE)
     val dividerHeight = if (compact) 40.dp else 56.dp
 
@@ -54,39 +58,57 @@ fun PodStatus(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        BatteryColumn(
-            label = stringResource(R.string.batt_left_pod),
-            pod = batteryParams.left,
-            wearState = wearStatus.left,
-            modifier = Modifier.weight(1f),
-            compact = compact
-        )
-        Box(
-            modifier = Modifier
-                .width(0.5.dp)
-                .height(dividerHeight)
-                .background(dividerColor)
-        )
-        BatteryColumn(
-            label = stringResource(R.string.batt_right_pod),
-            pod = batteryParams.right,
-            wearState = wearStatus.right,
-            modifier = Modifier.weight(1f),
-            compact = compact
-        )
-        Box(
-            modifier = Modifier
-                .width(0.5.dp)
-                .height(dividerHeight)
-                .background(dividerColor)
-        )
-        BatteryColumn(
-            label = stringResource(R.string.pod_case),
-            pod = batteryParams.case,
-            wearState = wearStatus.case,
-            modifier = Modifier.weight(1f),
-            compact = compact
-        )
+        when (batteryForm) {
+            BatteryForm.SINGLE_DEVICE -> {
+                // One-piece device (headset / neckband / speaker): a single whole-device
+                // battery. Prefer `left` when reported, otherwise fall back to `case`.
+                val whole = batteryParams.left?.takeIf { it.isConnected }
+                    ?: batteryParams.case?.takeIf { it.isConnected }
+                    ?: batteryParams.left ?: batteryParams.case
+                BatteryColumn(
+                    label = stringResource(R.string.pod_case),
+                    pod = whole,
+                    wearState = null,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+            }
+            else -> {
+                BatteryColumn(
+                    label = stringResource(R.string.batt_left_pod),
+                    pod = batteryParams.left,
+                    wearState = wearStatus.left,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+                Box(
+                    modifier = Modifier
+                        .width(0.5.dp)
+                        .height(dividerHeight)
+                        .background(dividerColor)
+                )
+                BatteryColumn(
+                    label = stringResource(R.string.batt_right_pod),
+                    pod = batteryParams.right,
+                    wearState = wearStatus.right,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+                Box(
+                    modifier = Modifier
+                        .width(0.5.dp)
+                        .height(dividerHeight)
+                        .background(dividerColor)
+                )
+                BatteryColumn(
+                    label = stringResource(R.string.pod_case),
+                    pod = batteryParams.case,
+                    wearState = wearStatus.case,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+            }
+        }
     }
 }
 

@@ -358,6 +358,7 @@ private fun LazyListScope.podControlItems(
             PodStatus(
                 batteryParams = batteryParams,
                 wearStatus = wearStatus,
+                batteryForm = capabilities.batteryForm,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp)
             )
         }

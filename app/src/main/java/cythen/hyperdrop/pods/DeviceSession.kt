@@ -1033,7 +1033,10 @@ class DeviceSession {
                     Log.i(TAG, "dual connection: ${report.enabled}")
                 }
             }
-            is GaiaReport.SupportedFeatures -> Log.i(TAG, "supported features: ${report.features}")
+            is GaiaReport.SupportedFeatures -> {
+                Log.i(TAG, "supported features: ${report.features}")
+                DeviceRegistry.recordObservedFeatures(deviceName(), report.features)
+            }
             GaiaReport.GaiaNegotiation -> {
                 Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
             }
@@ -1312,6 +1315,11 @@ class DeviceSession {
     private suspend fun sendStatusQueryPackets(immediateReconnect: Boolean = true) {
         val reason = if (immediateReconnect) "status query" else null
         sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode), reason)
+        delay(100)
+        // Feature discovery first so observation can open capabilities before the UI reads them.
+        commandTable().querySupportedFeatures?.let {
+            sendPacketSafe(GaiaTransport.v4(it), "supported features query")
+        }
         delay(100)
         sendPacketSafe(GaiaTransport.v4(commandTable().queryGainLevel))
         delay(100)

@@ -1,6 +1,7 @@
 package cythen.hyperdrop.device
 
 import cythen.hyperdrop.config.ConfigManager
+import cythen.hyperdrop.device.CapabilityProfile.Companion.OBSERVATION_RULES
 import cythen.hyperdrop.pods.AncImplementation
 
 /**
@@ -8,8 +9,13 @@ import cythen.hyperdrop.pods.AncImplementation
  *
  * Matching is data-driven via [DeviceModels]: the longest alias that is a substring of the
  * Bluetooth name wins; a MOONDROP-branded name that matches no model falls back to a
- * conservative inferred profile; anything else falls back to [StandardBluetoothProfile],
- * which claims no capabilities.
+ * conservative inferred profile that probes capabilities on connect (layer-2 fallback);
+ * anything else falls back to [StandardBluetoothProfile], which claims no capabilities.
+ *
+ * Runtime observation (GET_SUPPORTED_FEATURES) may OPEN capabilities that the factory
+ * declaration left closed, but never closes a declared one — the declaration is
+ * authoritative on conflict. See [resolveCapabilities]. Observations are cached per
+ * device name so the UI reflects them even before the next query cycle.
  *
  * Adding a MOONDROP model = one entry in [DeviceModels.models]. No change needed in
  * pods/, hook/ or ui/.
@@ -22,6 +28,12 @@ object DeviceRegistry {
     /** Conservative fallback for a non-MOONDROP device. */
     val fallbackProfile: DeviceProfile = StandardBluetoothProfile
 
+    /** Per-device feature ids observed from GET_SUPPORTED_FEATURES at runtime. */
+    private val observedFeatures = HashMap<String, Set<Int>>()
+
+    /** Normalised key so the writer (session) and reader (UI) always agree. */
+    private fun featureKey(deviceName: String): String = DeviceModels.normalize(deviceName)
+
     fun profileFor(name: String?): DeviceProfile =
         DeviceModels.match(name) ?: fallbackProfile
 
@@ -29,13 +41,47 @@ object DeviceRegistry {
     fun isSupported(name: String?): Boolean =
         name != null && DeviceModels.match(name) != null
 
-    /** Lookup by stable id, for IPC payloads that carry a device id (phase F). */
+    /** Lookup by stable id, for IPC payloads that carry a device id. */
     fun profileById(id: String): DeviceProfile =
         registeredProfiles.firstOrNull { it.id == id } ?: fallbackProfile
 
     /**
-     * Capabilities for [deviceName] with per-feature user overrides applied on top of the
-     * profile's auto-detected values.
+     * Record features reported by the device and keep only the union — observation can
+     * accumulate but never retract a feature within a session.
+     */
+    fun recordObservedFeatures(deviceName: String, features: Set<Int>) {
+        val key = featureKey(deviceName)
+        val current = observedFeatures[key].orEmpty()
+        observedFeatures[key] = current + features
+    }
+
+    fun clearObservedFeatures(deviceName: String) {
+        observedFeatures.remove(featureKey(deviceName))
+    }
+
+    /** Whether this device's control profile asks for GET_SUPPORTED_FEATURES on connect. */
+    fun shouldProbeOnConnect(name: String?): Boolean = profileFor(name).controlProfile.probeOnConnect
+
+    /**
+     * Apply observed features to a declared capability view. Two-state semantics:
+     * a declared capability stays authoritative; each observed feature opens the
+     * capability it governs. Never closes anything.
+     */
+    internal fun resolveCapabilities(
+        declared: DeviceCapabilities,
+        features: Set<Int>,
+    ): DeviceCapabilities {
+        if (features.isEmpty()) return declared
+        var result = declared
+        OBSERVATION_RULES.forEach { rule ->
+            if (features.contains(rule.featureId)) result = rule.open(result)
+        }
+        return result
+    }
+
+    /**
+     * Capabilities for [deviceName]: factory declaration + runtime observation + the
+     * per-feature user overrides applied on top.
      */
     fun detectDeviceCapabilities(
         deviceName: String,
@@ -44,7 +90,9 @@ object DeviceRegistry {
         spatialSoundSwitchOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
         ancImplementationOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
     ): DeviceCapabilities {
-        val base = profileFor(deviceName).capabilities
+        val declared = profileFor(deviceName).capabilities
+        val observed = observedFeatures[featureKey(deviceName)].orEmpty()
+        val base = resolveCapabilities(declared, observed)
         return base.copy(
             adaptiveSupported = resolveCapability(adaptiveOverride, base.adaptiveSupported),
             spatialAudioSupported = resolveCapability(spatialAudioOverride, base.spatialAudioSupported),

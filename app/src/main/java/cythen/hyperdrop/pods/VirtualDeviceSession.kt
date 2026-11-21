@@ -1,4 +1,4 @@
-﻿package cythen.hyperdrop.pods
+package cythen.hyperdrop.pods
 
 import android.content.Context
 import android.content.Intent
@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import cythen.hyperdrop.BuildConfig
+import cythen.hyperdrop.device.BatteryForm
 import cythen.hyperdrop.device.DeviceModels
 import cythen.hyperdrop.device.DeviceProfile
 import cythen.hyperdrop.device.DeviceRegistry
@@ -183,7 +184,7 @@ object VirtualDeviceSession {
     private fun resetState(resolvedProfile: DeviceProfile) {
         val capabilities = resolvedProfile.capabilities
         currentAnc = capabilities.ancModes.firstOrNull()?.mode?.toUiStatus() ?: 1
-        currentGainLevel = if (capabilities.gainMap.isEmpty()) 0 else min(1, capabilities.gainMap.size - 1)
+        currentGainLevel = if (resolvedProfile.controlProfile.gainMap.isEmpty()) 0 else min(1, resolvedProfile.controlProfile.gainMap.size - 1)
         currentLedEnabled = capabilities.ledSupported
         currentPromptToneEnabled = false
         currentPromptVolume = 50
@@ -195,7 +196,7 @@ object VirtualDeviceSession {
         currentTransparencyVocalEnhancement = false
         currentEqPreset = -1
         currentWearStatus = WearStatus(left = WearState.WEARING, right = WearState.WEARING, case = null)
-        currentBatteryParams = if (capabilities.singleDeviceBattery) {
+        currentBatteryParams = if (capabilities.batteryForm == BatteryForm.SINGLE_DEVICE) {
             BatteryParams(
                 left = PodParams(battery = 88, isCharging = false, isConnected = true),
                 right = null,

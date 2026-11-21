@@ -3,15 +3,15 @@ package cythen.hyperdrop.device
 import cythen.hyperdrop.device.protocol.GaiaCommandTable
 
 /**
- * One supported device is one [DeviceProfile]. Everything that varies between models is a
- * property of the profile; the rest of the app talks to the abstract type.
+ * One supported device = one model archive ("机型档案").
  *
- * Adding a new MOONDROP model = one new [DeviceProfile] implementation + a
- * [GaiaCommandTable] for its wire protocol + one line in
- * [DeviceRegistry.registeredProfiles]. No change needed in pods/, hook/ or ui/.
+ * The profile is deliberately thin: it references a reusable [CapabilityProfile]
+ * (what the device can do) and a reusable [ControlProfile] (how to command it), plus
+ * identity/matching/image/verification metadata. Adding a model that reuses an existing
+ * mapping (e.g. MIRAGE = PUDDING) is now a single record — no capability or command copy.
  */
 interface DeviceProfile {
-    /** Stable identifier, e.g. "pudding". Used in IPC payloads from phase F. */
+    /** Stable identifier, e.g. "pudding". Used in IPC payloads. */
     val id: String
 
     /** Human-readable name shown in device pickers / debug UI. */
@@ -20,13 +20,19 @@ interface DeviceProfile {
     /** True when this profile owns the given Bluetooth name/alias. */
     fun matches(name: String?): Boolean
 
-    /** Auto-detected capabilities for this model, before user overrides. */
-    val capabilities: DeviceCapabilities
+    /** Declared capability archive reference. */
+    val capabilityProfile: CapabilityProfile
 
-    /** Byte-level command vocabulary for this model's GAIA flavour. */
-    val commandTable: GaiaCommandTable
+    /** Declared command-mapping archive reference. */
+    val controlProfile: ControlProfile
 
-    // ---- Declarative metadata (data-driven model registry) ------------------------
+    /** Capability view (declared, before runtime observation and user overrides). */
+    val capabilities: DeviceCapabilities get() = capabilityProfile.toCapabilities()
+
+    /** Byte-level command vocabulary — convenience view of [controlProfile]. */
+    val commandTable: GaiaCommandTable get() = controlProfile.table
+
+    // ---- Declarative metadata -----------------------------------------------------
 
     /** Normalised Bluetooth-name tokens that identify this model. */
     val aliases: List<String> get() = listOf(id)
@@ -34,7 +40,7 @@ interface DeviceProfile {
     /** True only for models verified on real hardware; false = protocol inferred. */
     val verified: Boolean get() = false
 
-    /** Short provenance / caveat shown in the detail UI ("实机验证" vs "协议推断"). */
+    /** Short provenance / caveat shown in the detail UI. */
     val note: String get() = ""
 
     /** Stable key used to locate this model's built-in art (asset slug). */
