@@ -111,7 +111,8 @@ data class ControlProfile(
             ancPathKind = ancPath,
             ancSetMap = ancSetMap,
             ancGetMap = ancGetMap,
-            gainMap = gainMap.ifEmpty { intArrayOf(0, 1, 2) },
+            // IntArray has no ifEmpty() in the standard library, so spell it out.
+            gainMap = if (gainMap.isEmpty()) intArrayOf(0, 1, 2) else gainMap,
         )
     }
 
