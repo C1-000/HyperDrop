@@ -404,20 +404,25 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    item {
-        Card(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
-        ) {
-            AncSwitch(
-                ancStatus = ancMode,
-                onAncModeChange = onAncModeChange,
-                smartAncLevel = smartAncLevel,
-                ancModes = ancModes,
-                transparencyVocalEnhancement = transparencyVocalEnhancement,
-                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
-                enabled = controlsEnabled && pending?.anc?.value != true &&
-                    pending?.transparency?.value != true && pending?.smartAncLevel?.value != true
-            )
+    // Hardware with no ANC (e.g. U.C.T.S — declared with an empty ancModes list) must not
+    // render the noise-cancellation block at all; AncSwitch itself always draws the three
+    // Transparency/ANC/Off buttons regardless of ancModes, so gate the whole card here.
+    if (capabilities.ancModes.isNotEmpty()) {
+        item {
+            Card(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+            ) {
+                AncSwitch(
+                    ancStatus = ancMode,
+                    onAncModeChange = onAncModeChange,
+                    smartAncLevel = smartAncLevel,
+                    ancModes = ancModes,
+                    transparencyVocalEnhancement = transparencyVocalEnhancement,
+                    onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                    enabled = controlsEnabled && pending?.anc?.value != true &&
+                        pending?.transparency?.value != true && pending?.smartAncLevel?.value != true
+                )
+            }
         }
     }
 

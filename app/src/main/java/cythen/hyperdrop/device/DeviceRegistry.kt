@@ -31,6 +31,16 @@ object DeviceRegistry {
     /** Per-device feature ids observed from GET_SUPPORTED_FEATURES at runtime. */
     private val observedFeatures = HashMap<String, Set<Int>>()
 
+    /**
+     * Per-device codecs confirmed by a real codec-state GET report at runtime. The
+     * GET_SUPPORTED_FEATURES bitmask only says "codec control exists" (feature 16) and
+     * cannot tell LC3/LDAC/LHDC apart, so a successful per-codec GET response is the
+     * only trustworthy evidence. Observation opens a capability, never closes one.
+     */
+    enum class ObservedCodec { LC3, LDAC, LHDC }
+
+    private val observedCodecs = HashMap<String, Set<ObservedCodec>>()
+
     /** Normalised key so the writer (session) and reader (UI) always agree. */
     private fun featureKey(deviceName: String): String = DeviceModels.normalize(deviceName)
 
@@ -56,7 +66,19 @@ object DeviceRegistry {
     }
 
     fun clearObservedFeatures(deviceName: String) {
-        observedFeatures.remove(featureKey(deviceName))
+        val key = featureKey(deviceName)
+        observedFeatures.remove(key)
+        observedCodecs.remove(key)
+    }
+
+    /**
+     * Record a codec confirmed by a successful state GET response. Codec observations
+     * accumulate for the session and are the runtime basis for opening the matching
+     * capability on devices whose factory declaration left it closed.
+     */
+    fun recordObservedCodec(deviceName: String, codec: ObservedCodec) {
+        val key = featureKey(deviceName)
+        observedCodecs[key] = observedCodecs[key].orEmpty() + codec
     }
 
     /** Whether this device's control profile asks for GET_SUPPORTED_FEATURES on connect. */
@@ -91,9 +113,17 @@ object DeviceRegistry {
         ancImplementationOverride: Int = ConfigManager.CAPABILITY_OVERRIDE_AUTO,
     ): DeviceCapabilities {
         val declared = profileFor(deviceName).capabilities
-        val observed = observedFeatures[featureKey(deviceName)].orEmpty()
+        val key = featureKey(deviceName)
+        val observed = observedFeatures[key].orEmpty()
         val base = resolveCapabilities(declared, observed)
-        return base.copy(
+        val codecs = observedCodecs[key].orEmpty()
+        // A confirmed codec GET report opens exactly that codec; never closes a declared one.
+        val withCodecs = base.copy(
+            lc3Supported = base.lc3Supported || codecs.contains(ObservedCodec.LC3),
+            ldacSupported = base.ldacSupported || codecs.contains(ObservedCodec.LDAC),
+            lhdcSupported = base.lhdcSupported || codecs.contains(ObservedCodec.LHDC),
+        )
+        return withCodecs.copy(
             adaptiveSupported = resolveCapability(adaptiveOverride, base.adaptiveSupported),
             spatialAudioSupported = resolveCapability(spatialAudioOverride, base.spatialAudioSupported),
             spatialSoundSwitchSupported = resolveCapability(spatialSoundSwitchOverride, base.spatialSoundSwitchSupported),

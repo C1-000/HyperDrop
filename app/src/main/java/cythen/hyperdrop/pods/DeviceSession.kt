@@ -255,18 +255,23 @@ class DeviceSession {
     private fun changeUILhdc(enabled: Boolean) {
         sendAppStatusBroadcast(OppoPodsAction.ACTION_LHDC_CHANGED) {
             putExtra("enabled", enabled)
+            // Carry the Bluetooth name so the App process can attribute the codec
+            // observation to the same device key it passes to detectDeviceCapabilities.
+            putExtra("device_name", deviceName())
         }
     }
 
     private fun changeUILc3(enabled: Boolean) {
         sendAppStatusBroadcast(OppoPodsAction.ACTION_LC3_CHANGED) {
             putExtra("enabled", enabled)
+            putExtra("device_name", deviceName())
         }
     }
 
     private fun changeUILdac(enabled: Boolean) {
         sendAppStatusBroadcast(OppoPodsAction.ACTION_LDAC_CHANGED) {
             putExtra("enabled", enabled)
+            putExtra("device_name", deviceName())
         }
     }
 
@@ -1046,6 +1051,8 @@ class DeviceSession {
                 ) {
                     Log.i(TAG, "LHDC: ignoring transient OFF during reconnect grace")
                 } else {
+                    // A real LHDC state report proves the device supports this codec.
+                    DeviceRegistry.recordObservedCodec(deviceName(), DeviceRegistry.ObservedCodec.LHDC)
                     currentLhdcEnabled = report.enabled
                     lhdcWriteGraceUntilMs = 0L
                     changeUILhdc(report.enabled)
@@ -1061,6 +1068,7 @@ class DeviceSession {
                 ) {
                     Log.i(TAG, "LC3: ignoring transient OFF during reconnect grace")
                 } else {
+                    DeviceRegistry.recordObservedCodec(deviceName(), DeviceRegistry.ObservedCodec.LC3)
                     currentLc3Enabled = report.enabled
                     lc3WriteGraceUntilMs = 0L
                     changeUILc3(report.enabled)
@@ -1075,6 +1083,7 @@ class DeviceSession {
                 ) {
                     Log.i(TAG, "LDAC: ignoring transient OFF during reconnect grace")
                 } else {
+                    DeviceRegistry.recordObservedCodec(deviceName(), DeviceRegistry.ObservedCodec.LDAC)
                     currentLdacEnabled = report.enabled
                     ldacWriteGraceUntilMs = 0L
                     changeUILdac(report.enabled)

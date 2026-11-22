@@ -116,10 +116,10 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 
 | 机型 | 连接 | ANC 路径与映射 | 其它能力 | 备注 |
 |---|---|---|---|---|
-| 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | **有空间音频**，三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量 | `PROFILES` + `DC_PROFILES` |
-| 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 同上 | 验证通过 |
+| 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | 三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量；**无空间音频**（真机反馈，MoonEar 旧档案的 hasSpatial=true 已过时） | `PROFILES` + `DC_PROFILES` |
+| 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 同上（无空间音频） | 验证通过 |
 | 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED | 涉及 9ECA 私有协议 |
-| 太空漫游2 ULTRA | 国产 SoC | 验证通过，协议未公开 | — | — |
+| 太空漫游2 ULTRA | 国产 SoC | 仅记"实机验证通过"，无公开控制命令；HyperDrop 按保守推断处理 | — | `verified=false`，未纳入实机验证档案 |
 | U.C.T.S (MD-OWS-014) | GAIA | 开放式耳机，**硬件无降噪** | 左右耳电量正常 | 无 ANC 能力 |
 | 布丁 PUDDING (MD-TWS-056) | GAIA V4 / RFCOMM | ANC_V2 5 档：关0/自适应1/通透2/抗风3/基础4；GET 方向 `[0,4,2,3,1]` | 三路电量、三档增益 `[2,1,0]`、指示灯、LHDC | `ANC_V2_PROFILES` + `DC_PROFILES`；`gainFeature=0x1E`、`ledFeature=0x26` |
 | 猫咖 MOCA | 疑似蓝讯 BT5.4/LC3 | — | 三档增益 + 指示灯 | `DC_PROFILES` |
@@ -128,7 +128,7 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 
 **其它已归档但为"理论支持"的机型**：ALICE (QCC5151)、SPARKS (QCC3040)、VOYAGER (QCC5144)、NEKOCAKE (BT8922E)、PILL (BT8932F)、ULTRASONIC (BT8952F)、Robin (BT8952F)、太空漫游一代、方糖 BLOCK、羽翼 EDGE·EDGE2。
 
-> HyperDrop 现已把上表 7 款 MoonEar 实机验证机型的能力与控制映射加入档案并标 `verified=true`（其中 PUDDING 与 MIRAGE 共享同一档案；MIRAGE 为布丁联动版），共 8 款 verified。其余 37 款仍为协议推断。建议后续用真机日志逐款核对增益/LED/ANC 细节。
+> HyperDrop 已把上表中 6 款有实际控制命令数据的 MoonEar 实机验证机型（GA2、梦回1979、太空漫游2、U.C.T.S、PUDDING、MOCA）的能力与控制映射加入档案并标 `verified=true`，加上布丁联动版 MIRAGE（与 PUDDING 共享同一档案），共 7 款 verified。太空漫游2 ULTRA 虽被参考项目记为"实机验证通过"，但无公开控制命令数据，按保守推断处理（`verified=false`），其编码/双连等能力由回包驱动观测开放。其余 38 款仍为协议推断。建议后续用真机日志逐款核对增益/LED/ANC 细节。
 
 ## 8. Codec（编码）控制方案
 

@@ -90,9 +90,11 @@ class DeviceCapabilitiesTest {
         assertEquals("fallback", DeviceModels.match("MOONDROP something new")?.id)
         // Non-MOONDROP name is not a supported device.
         assertNull(DeviceModels.match("Some random headphones"))
-        assertEquals(8, DeviceModels.models.count { it.verified })
-        // The seven MoonEar real-device verified models (+ MIRAGE linked variant).
-        listOf("golden_ages", "golden_ages_2", "space_travel_2", "space_travel_2_ultra",
+        assertEquals(7, DeviceModels.models.count { it.verified })
+        // MoonEar real-device verified models (+ MIRAGE linked variant). Space Travel 2
+        // Ultra is NOT verified: it was reported as human-tested but has no published
+        // control commands, so it stays conservative and inferred (verified=false).
+        listOf("golden_ages", "golden_ages_2", "space_travel_2",
             "moondrop_u_c_t_s", "me_163_komet_moca", "pudding").forEach { id ->
             assertTrue("$id must be verified", DeviceRegistry.profileById(id).verified)
         }
@@ -100,9 +102,13 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun `verified profiles carry MoonEar real-device capabilities`() {
-        // GA2 / Golden Ages: AudioCuration 4-gang, spatial audio, reversed gain, no LED.
+        // GA2 / Golden Ages: AudioCuration 4-gang, reversed gain, no LED.
+        // Per real-device feedback neither has spatial audio (MoonEar's stale profile
+        // claimed GA2 did) — assert false so a regression is caught.
         val ga2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Golden Ages 2")
-        assertTrue(ga2.spatialAudioSupported)
+        assertFalse(ga2.spatialAudioSupported)
+        val ga1979 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Golden Ages")
+        assertFalse(ga1979.spatialAudioSupported)
         assertTrue(ga2.gainSupported)
         assertFalse(ga2.ledSupported)
         assertEquals(4, ga2.ancModes.size)
@@ -162,9 +168,9 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `model catalogue has 45 unique image keys with eight verified`() {
+    fun `model catalogue has 45 unique image keys with seven verified`() {
         assertEquals(45, DeviceModels.models.size)
-        assertEquals(8, DeviceModels.models.count { it.verified })
+        assertEquals(7, DeviceModels.models.count { it.verified })
         val keys = DeviceModels.models.map { it.imageKey }
         assertEquals("imageKey must be unique", keys.size, keys.toSet().size)
         // Every imageKey except the deliberate fallback resolves to a bundled set.
@@ -292,16 +298,36 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `codec feature observation opens LC3, LDAC and LHDC`() {
-        // GAIA feature 16 only signals that codec control exists; the bit-level
-        // report cannot tell the codecs apart, so all three open conservatively.
-        val observed = DeviceRegistry.resolveCapabilities(
+    fun `codec capability opens only from a real codec report not the coarse feature bit`() {
+        // GAIA feature 16 only signals "codec control present" and cannot distinguish
+        // LC3 / LDAC / LHDC. It must NOT open any codec by itself — doing so would show
+        // codec switches on devices that do not implement them.
+        val coarseOnly = DeviceRegistry.resolveCapabilities(
             DeviceCapabilities.NONE,
             setOf(CapabilityProfile.F_CODEC_TYPE),
         )
-        assertTrue(observed.lhdcSupported)
+        assertFalse(coarseOnly.lhdcSupported)
+        assertFalse(coarseOnly.lc3Supported)
+        assertFalse(coarseOnly.ldacSupported)
+
+        // A confirmed per-codec GET report opens exactly that codec, on the matching key.
+        val name = "MOONDROP codec probe test"
+        DeviceRegistry.clearObservedFeatures(name)
+        assertFalse(DeviceRegistry.detectDeviceCapabilities(name).lc3Supported)
+        DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LC3)
+        val observed = DeviceRegistry.detectDeviceCapabilities(name)
         assertTrue(observed.lc3Supported)
-        assertTrue(observed.ldacSupported)
+        assertFalse(observed.ldacSupported)
+        assertFalse(observed.lhdcSupported)
+        DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LDAC)
+        DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LHDC)
+        val all = DeviceRegistry.detectDeviceCapabilities(name)
+        assertTrue(all.lc3Supported)
+        assertTrue(all.ldacSupported)
+        assertTrue(all.lhdcSupported)
+        // Clearing observations also clears codec attribution (e.g. device switch).
+        DeviceRegistry.clearObservedFeatures(name)
+        assertFalse(DeviceRegistry.detectDeviceCapabilities(name).lc3Supported)
     }
 
     @Test

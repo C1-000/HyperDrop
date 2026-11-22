@@ -269,9 +269,10 @@ object DeviceModels {
         inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), "moondrop_edge_2", pairs = ac3Pairs, gain = gainIdentity, batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), "moondrop_evo_2"),
         // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (the
-        // ac4Pairs + AUDIO_CURATION default), reversed gain, spatial audio, no LED.
-        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed, spatial = true, verified = true),
-        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, spatial = true, promptTone = true, verified = true),
+        // ac4Pairs + AUDIO_CURATION default), reversed gain, no LED. Per real-device
+        // feedback neither Golden Ages (1979) nor Golden Ages 2 (梦回2) has spatial audio.
+        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed, verified = true),
+        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, promptTone = true, verified = true),
         inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), "moondrop_littlewhite", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), "moondrop_mm3a"),
         inferred("maca", "MOONDROP MACA", listOf("maca"), "moondrop_moca", lhdc = true, spatial = true),
@@ -302,10 +303,12 @@ object DeviceModels {
         inferred("robins", "Robin's Earphones", listOf("robins", "robin", "robin's earphones"), "robin_s_earphones"),
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
         // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (default),
-        // reversed gain, no spatial/LED. Space Travel 2 Ultra protocol unpublished → conservative
-        // capabilities but still verified (real hardware confirmed working via GAIA).
+        // reversed gain, no spatial/LED (2026-09-01 two-way measured data in MoonEar).
         inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2", gain = gainReversed, verified = true),
-        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed, verified = true),
+        // Space Travel 2 Ultra: MoonEar only records "verified working" with no control
+        // command data and unpublished protocol. Keep conservative capabilities and treat
+        // as protocol-inferred until real control mappings are known.
+        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed),
         inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), "susanoo_tws"),
         inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), "zzz_angels_ows"),
     )

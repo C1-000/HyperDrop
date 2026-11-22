@@ -332,15 +332,19 @@ private fun PortraitPopupBody(
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Card(modifier = Modifier.fillMaxWidth()) {
-            AncSwitch(
-                ancStatus = ancMode,
-                onAncModeChange = onAncModeChange,
-                ancModes = ancModes,
-                transparencyVocalEnhancement = transparencyVocalEnhancement,
-                onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
-                enabled = controlsEnabled
-            )
+        // Hide the whole ANC block for hardware with no noise cancellation (empty ancModes,
+        // e.g. U.C.T.S). AncSwitch itself always draws the three ANC buttons unconditionally.
+        if (ancModes.isNotEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                AncSwitch(
+                    ancStatus = ancMode,
+                    onAncModeChange = onAncModeChange,
+                    ancModes = ancModes,
+                    transparencyVocalEnhancement = transparencyVocalEnhancement,
+                    onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                    enabled = controlsEnabled
+                )
+            }
         }
         if (!controlsEnabled) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -404,16 +408,18 @@ private fun LandscapePopupBody(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Card(modifier = Modifier.fillMaxWidth()) {
-                AncSwitch(
-                    ancMode,
-                    onAncModeChange = onAncModeChange,
-                    compact = true,
-                    ancModes = ancModes,
-                    transparencyVocalEnhancement = transparencyVocalEnhancement,
-                    onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
-                    enabled = controlsEnabled
-                )
+            if (ancModes.isNotEmpty()) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    AncSwitch(
+                        ancMode,
+                        onAncModeChange = onAncModeChange,
+                        compact = true,
+                        ancModes = ancModes,
+                        transparencyVocalEnhancement = transparencyVocalEnhancement,
+                        onTransparencyVocalEnhancementChange = onTransparencyVocalEnhancementChange,
+                        enabled = controlsEnabled
+                    )
+                }
             }
         }
         Column(

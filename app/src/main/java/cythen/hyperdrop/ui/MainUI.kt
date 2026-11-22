@@ -381,16 +381,25 @@ fun MainUI(
                     OppoPodsAction.ACTION_LHDC_CHANGED -> {
                         lhdcEnabled.value = p1.getBooleanExtra("enabled", lhdcEnabled.value)
                         pending.lhdc.value = false
+                        p1.getStringExtra("device_name")?.let { name ->
+                            DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LHDC)
+                        }
                     }
 
                     OppoPodsAction.ACTION_LC3_CHANGED -> {
                         lc3Enabled.value = p1.getBooleanExtra("enabled", lc3Enabled.value)
                         pending.lc3.value = false
+                        p1.getStringExtra("device_name")?.let { name ->
+                            DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LC3)
+                        }
                     }
 
                     OppoPodsAction.ACTION_LDAC_CHANGED -> {
                         ldacEnabled.value = p1.getBooleanExtra("enabled", ldacEnabled.value)
                         pending.ldac.value = false
+                        p1.getStringExtra("device_name")?.let { name ->
+                            DeviceRegistry.recordObservedCodec(name, DeviceRegistry.ObservedCodec.LDAC)
+                        }
                     }
 
                     OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED -> {

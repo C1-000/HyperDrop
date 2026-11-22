@@ -121,10 +121,11 @@ data class CapabilityProfile(
             },
             ObservationRule(F_DAC_GAIN) { it.copy(gainSupported = true) },
             // GAIA feature 16 only signals "codec control present"; the bitmask cannot
-            // distinguish LC3 / LDAC / LHDC, so observation opens all three conservatively.
-            ObservationRule(F_CODEC_TYPE) {
-                it.copy(lhdcSupported = true, lc3Supported = true, ldacSupported = true)
-            },
+            // distinguish LC3 / LDAC / LHDC. Codec capabilities are opened exclusively by
+            // a successful per-codec state GET report (DeviceRegistry.recordObservedCodec),
+            // so this rule deliberately opens no codec — declaring them here would show
+            // codec switches that a device may not actually support.
+            ObservationRule(F_CODEC_TYPE) { it },
             ObservationRule(F_LED) { it.copy(ledSupported = true) },
             ObservationRule(F_ONEBRINGTWO) { it.copy(dualConnectionSupported = true) },
         )
