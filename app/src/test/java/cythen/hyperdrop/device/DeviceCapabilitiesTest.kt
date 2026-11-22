@@ -118,11 +118,19 @@ class DeviceCapabilitiesTest {
         // wire setMap and are driven by the top three buttons, not the strength tab.
         assertEquals(2, ga2.ancModes.size)
         assertTrue(ga2.ancModes.all { it.mode.isNoiseCancellation() })
-        // Space Travel 2: reversed gain, no spatial, no LED.
+        // Space Travel 2: reversed gain, no spatial, no LED; prompt tone + dual-device
+        // connection are real-hardware verified; there are NO codec (LHDC/LC3/LDAC) controls.
+        val st2Profile = DeviceRegistry.profileFor("Space Travel 2")
+        assertEquals("Space Travel 2", st2Profile.displayName)
         val st2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Space Travel 2")
         assertTrue(st2.gainSupported)
         assertFalse(st2.spatialAudioSupported)
         assertFalse(st2.ledSupported)
+        assertTrue(st2.promptToneSupported)
+        assertTrue(st2.dualConnectionSupported)
+        assertFalse(st2.lhdcSupported)
+        assertFalse(st2.lc3Supported)
+        assertFalse(st2.ldacSupported)
         // U.C.T.S: open-fit, hardware has NO ANC.
         val ucts = DeviceRegistry.detectDeviceCapabilities("Moondrop U.C.T.S.")
         assertTrue(ucts.ancModes.isEmpty())
@@ -303,6 +311,26 @@ class DeviceCapabilitiesTest {
         // Response cmd 0x05 with sub 0x04/0x05 is accepted; old 0x03 was never hit.
         val r = table.parse(byteArrayOf(0, 0x1D, 0x05, 0x04, 0x01))
         assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.AncMode)
+    }
+
+    @Test
+    fun `AUDIO_CURATION SET echo uses wire map while GET uses index map`() {
+        // AudioCuration devices (Ultrasonic / Space Travel 2) SET a wire enum [1,2,4,3]
+        // but GET reports a 0-based index [0,1,2,3]. The SET echo (sub 0x04) must be
+        // decoded with the wire->UI map, otherwise a tap bounces the UI to a wrong mode.
+        val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable(
+            ancPathKind = cythen.hyperdrop.device.protocol.AncPathKind.AUDIO_CURATION,
+            ancSetMap = intArrayOf(-1, 1, 2, 4, 3), // ui OFF=1->1, NC=2->2, TRANS=3->4, SMART=4->3
+            ancGetMap = intArrayOf(1, 2, 3, 4),     // index 0->OFF,1->NC,2->TRANS,3->SMART
+        )
+        // SET echo (sub=0x04) carries the wire value 2 for NOISE_CANCELLATION (ui=2).
+        val echo = table.parse(byteArrayOf(0, 0x1D, 0x11, 0x04, 0x02))
+        assertTrue(echo is cythen.hyperdrop.device.protocol.GaiaReport.AncMode)
+        assertEquals(2, (echo as cythen.hyperdrop.device.protocol.GaiaReport.AncMode).uiStatus)
+        // GET response (sub=0x03) carries index 1 for NOISE_CANCELLATION (ui=2).
+        val get = table.parse(byteArrayOf(0, 0x1D, 0x11, 0x03, 0x01))
+        assertTrue(get is cythen.hyperdrop.device.protocol.GaiaReport.AncMode)
+        assertEquals(2, (get as cythen.hyperdrop.device.protocol.GaiaReport.AncMode).uiStatus)
     }
 
     @Test

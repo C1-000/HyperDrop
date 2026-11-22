@@ -314,7 +314,12 @@ object DeviceModels {
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
         // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (default),
         // reversed gain, no spatial/LED (2026-09-01 two-way measured data in MoonEar).
-        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2", gain = gainReversed, verified = true),
+        // User-corrected 2026-11-22: display name "Space Travel 2"; real hardware supports
+        // prompt tone + dual-device connection, and has NO codec (LHDC/LC3/LDAC) settings.
+        inferred(
+            "space_travel_2", "Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2",
+            gain = gainReversed, promptTone = true, dualConnection = true, verified = true,
+        ),
         // Space Travel 2 Ultra: MoonEar only records "verified working" with no control
         // command data and unpublished protocol. Keep conservative capabilities and treat
         // as protocol-inferred until real control mappings are known.

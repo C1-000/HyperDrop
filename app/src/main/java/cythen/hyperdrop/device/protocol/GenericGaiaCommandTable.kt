@@ -119,15 +119,31 @@ class GenericGaiaCommandTable(
         // (cmd 0x05) uses subs 0x04/0x05 — never 0x03/0x04 like V2/AudioCuration.
         val ancResponseCmd: Int
         val ancSubs: IntArray
+        val ancSetResponseSub: Int
         when (ancPath) {
-            AncPathKind.ANC_V2 -> { ancResponseCmd = 0x41; ancSubs = intArrayOf(0x03, 0x04) }
-            AncPathKind.AUDIO_CURATION -> { ancResponseCmd = 0x11; ancSubs = intArrayOf(0x03, 0x04) }
-            AncPathKind.ANC_V1 -> { ancResponseCmd = 0x05; ancSubs = intArrayOf(0x04, 0x05) }
+            AncPathKind.ANC_V2 -> {
+                ancResponseCmd = 0x41; ancSubs = intArrayOf(0x03, 0x04); ancSetResponseSub = 0x04
+            }
+            AncPathKind.AUDIO_CURATION -> {
+                ancResponseCmd = 0x11; ancSubs = intArrayOf(0x03, 0x04); ancSetResponseSub = 0x04
+            }
+            AncPathKind.ANC_V1 -> {
+                ancResponseCmd = 0x05; ancSubs = intArrayOf(0x04, 0x05); ancSetResponseSub = 0x05
+            }
         }
         if (cmd == ancResponseCmd && ancSubs.contains(sub) && payload.size >= 5) {
             val reported = payload[4].toInt() and 0xFF
-            val ui = ancGetMap.getOrNull(reported)?.takeIf { it >= 0 }
-                ?: ancSetMap.indexOf(reported).takeIf { it >= 0 }
+            // A SET echo (sub == ancSetResponseSub) carries the exact wire value we sent,
+            // so invert the SET map. A GET response carries the device's reported index —
+            // on AUDIO_CURATION that is a 0-based index distinct from the SET wire enum
+            // (verified GA2/ST2 [1,2,4,3] SET vs [0,1,2,3] GET). Applying the GET map to a
+            // SET echo made the UI bounce back to a wrong mode right after a tap.
+            val ui = if (sub == ancSetResponseSub) {
+                ancSetMap.indexOf(reported).takeIf { it >= 0 }
+            } else {
+                ancGetMap.getOrNull(reported)?.takeIf { it >= 0 }
+                    ?: ancSetMap.indexOf(reported).takeIf { it >= 0 }
+            }
             if (ui != null) return GaiaReport.AncMode(ui, reported)
         }
 

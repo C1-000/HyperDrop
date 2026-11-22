@@ -117,6 +117,10 @@ class DeviceSession {
     private var lc3WriteGraceUntilMs = 0L
     private var ldacWriteGraceUntilMs = 0L
     private var dualWriteGraceUntilMs = 0L
+    /** UI value we just wrote to the device; contradictory ANC reports are ignored
+     *  during [ancWriteGraceUntilMs] so a stale GET echo cannot bounce the UI back. */
+    private var ancWriteGraceUntilMs = 0L
+    private var ancWriteExpectedUi = -1
     /** Number of follow-up feature pages already requested in the current discovery. */
     private val featurePageCount = AtomicInteger(0)
     private var lastKnownLeftBattery: Int = 0
@@ -994,14 +998,32 @@ class DeviceSession {
         Log.v(TAG, "GAIA payload: ${payload.toHexString(HexFormat.UpperCase)}")
         when (val report = commandTable().parse(payload)) {
             is GaiaReport.AncMode -> {
-                val previousAnc = currentAnc
-                currentAnc = report.uiStatus
-                changeUIAncStatus(currentAnc)
-                Log.i(TAG, "noise mode: ui=${report.uiStatus} wire=${report.wire} previous=$previousAnc")
-                // A mode change made outside HyperDrop (e.g. an earbud long-press) refreshes
-                // battery immediately. App-originated SETs update currentAnc first, so their
-                // echo does not trigger an extra battery query.
-                if (previousAnc != currentAnc) queryBattery()
+                // After an app-originated SET we already show the optimistic value. Some
+                // AUDIO_CURATION devices echo a stale/GET-style value in the follow-up
+                // query, which previously bounced the UI back until a second tap. Ignore
+                // any contradictory report inside the short write-confirm grace window;
+                // a matching report just confirms our optimistic value.
+                if (ancWriteExpectedUi >= 0 &&
+                    SystemClock.elapsedRealtime() < ancWriteGraceUntilMs &&
+                    report.uiStatus != ancWriteExpectedUi
+                ) {
+                    Log.i(
+                        TAG,
+                        "ANC: ignoring contradictory report ui=${report.uiStatus} " +
+                            "during write-confirm grace (expected=$ancWriteExpectedUi)",
+                    )
+                } else {
+                    val previousAnc = currentAnc
+                    currentAnc = report.uiStatus
+                    ancWriteGraceUntilMs = 0L
+                    ancWriteExpectedUi = -1
+                    changeUIAncStatus(currentAnc)
+                    Log.i(TAG, "noise mode: ui=${report.uiStatus} wire=${report.wire} previous=$previousAnc")
+                    // A mode change made outside HyperDrop (e.g. an earbud long-press) refreshes
+                    // battery immediately. App-originated SETs update currentAnc first, so their
+                    // echo does not trigger an extra battery query.
+                    if (previousAnc != currentAnc) queryBattery()
+                }
             }
             is GaiaReport.Battery -> {
                 val left = report.left?.let { BatteryParser.BatteryInfo(it, false) }
@@ -1399,6 +1421,10 @@ class DeviceSession {
         val packet = commandTable().setNoiseMode(mode) ?: return
         Log.d(TAG, "set noise mode: ui=$mode wire=${commandTable().ancUiToWire(mode)}")
         currentAnc = mode
+        // Protect the optimistic UI value: ignore contradictory reports briefly while
+        // the device settles, so a stale GET echo cannot bounce the selection back.
+        ancWriteExpectedUi = mode
+        ancWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
         changeUIAncStatus(mode)
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(GaiaTransport.v4(packet), "noise control")

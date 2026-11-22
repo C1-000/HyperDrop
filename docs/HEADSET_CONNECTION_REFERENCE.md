@@ -118,13 +118,15 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 |---|---|---|---|---|
 | 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | 三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量；**有空间音频**（真机反馈）、**LC3 + LDAC 编码** | `PROFILES` + `DC_PROFILES` |
 | 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 三档增益、无 LED；**LC3 + LDAC 编码** | 验证通过 |
-| 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED | 涉及 9ECA 私有协议 |
+| 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED；**提示音 + 双设备连接**；**无 codec 设置** | 涉及 9ECA 私有协议；HyperDrop 显示名更正为 "Space Travel 2"（用户真机反馈 2026-11-22） |
 | 太空漫游2 ULTRA | 国产 SoC | 仅记"实机验证通过"，无公开控制命令；HyperDrop 按保守推断处理 | — | `verified=false`，未纳入实机验证档案 |
 | U.C.T.S (MD-OWS-014) | GAIA | 开放式耳机，**硬件无降噪** | 左右耳电量正常 | 无 ANC 能力 |
 | 布丁 PUDDING (MD-TWS-056) | GAIA V4 / RFCOMM | ANC_V2 5 档：关0/自适应1/通透2/抗风3/基础4；GET 方向 `[0,4,2,3,1]` | 三路电量、三档增益 `[2,1,0]`、指示灯、LHDC | `ANC_V2_PROFILES` + `DC_PROFILES`；`gainFeature=0x1E`、`ledFeature=0x26` |
 | 猫咖 MOCA | 疑似蓝讯 BT5.4/LC3 | — | 三档增益 + 指示灯 | `DC_PROFILES` |
 
 **PUDDING ANC 细节**：SET `00 1D 40 04 <mode>`，RX `00 1D 41 04 <mode>`；mode 关=0x00 / 自适应=0x01 / 通透=0x02 / 抗风=0x03 / 基础降噪=0x04。UI 顺序为 关/降噪/通透/抗风/自适应 (`ANC_UI_ORDER = [1,0,2,4,5,3]`)。这与 HyperDrop `PuddingCommandTable` 的 wire 值完全一致（HyperDrop 的 UI status 编号 1..5 与之不同，但映射表已对齐）。
+
+**AudioCuration SET 回显 vs GET 响应的编号差异（ANC 切换 UI 回弹根因，2026-11-22 修复）**：GA2 / Space Travel 2 / Ultrasonic 等 AudioCuration 机型，SET 用 wire 枚举 `[1,2,4,3]`（关/降噪/通透/智能），但 GET_CURRENT_MODE 返回的是 **0-based 索引** `[0,1,2,3]`。二者编号体系不同，不能用同一张映射表解码：`GenericGaiaCommandTable.parse` 现按 sub 区分——SET 回显（sub=0x04）用 `ancSetMap` 的 wire→UI 反查，GET 响应（sub=0x03）用 `ancGetMap` 的索引→UI 映射。旧实现把 GET 索引表套在 SET 回显上（wire=2 被误读为 index=2→通透），导致点击"降噪"后 UI 弹到错误档位、再点一次才正常。`DeviceSession` 另加 5 秒写确认 grace：SET 后短暂忽略与写入值冲突的回包，防止设备未 settle 时的旧值回弹。
 
 **其它已归档但为"理论支持"的机型**：ALICE (QCC5151)、SPARKS (QCC3040)、VOYAGER (QCC5144)、NEKOCAKE (BT8922E)、PILL (BT8932F)、ULTRASONIC (BT8952F)、Robin (BT8952F)、太空漫游一代、方糖 BLOCK、羽翼 EDGE·EDGE2。
 
