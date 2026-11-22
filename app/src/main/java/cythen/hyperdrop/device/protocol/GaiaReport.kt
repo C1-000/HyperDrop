@@ -29,6 +29,9 @@ sealed interface GaiaReport {
     /** LHDC codec toggle report (feature 0x10). */
     data class Lhdc(val enabled: Boolean) : GaiaReport
 
+    /** LC3 codec toggle report (feature 0x10). */
+    data class Lc3(val enabled: Boolean) : GaiaReport
+
     /** Dual-connection toggle report (feature 0x14). */
     data class DualConnection(val enabled: Boolean) : GaiaReport
 

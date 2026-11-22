@@ -44,6 +44,7 @@ import cythen.hyperdrop.pods.NoiseControlMode
 import cythen.hyperdrop.pods.WearStatus
 import cythen.hyperdrop.ui.ControlPendingState
 import cythen.hyperdrop.ui.components.AncSwitch
+import cythen.hyperdrop.ui.components.ExclusionStates
 import cythen.hyperdrop.ui.components.MutualExclusionDialog
 import cythen.hyperdrop.ui.components.MutualExclusionTarget
 import cythen.hyperdrop.ui.components.rememberMutualExclusionState
@@ -56,6 +57,7 @@ import cythen.hyperdrop.pods.EqPreset
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun PodDetailPage(
@@ -89,6 +91,8 @@ fun PodDetailPage(
     onHeadTrackingChange: (Boolean) -> Unit = {},
     lhdcEnabled: Boolean = false,
     onLhdcChange: (Boolean) -> Unit = {},
+    lc3Enabled: Boolean = false,
+    onLc3Change: (Boolean) -> Unit = {},
     dualConnectionEnabled: Boolean = false,
     onDualConnectionChange: (Boolean) -> Unit = {},
     capabilities: DeviceCapabilities = DeviceCapabilities.NONE,
@@ -105,48 +109,50 @@ fun PodDetailPage(
     val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey).box
     val imagePainter = rememberPodImagePainter(boxImagePath, builtinBoxRes)
 
-    // LHDC and dual-device connection are mutually exclusive in firmware. Route
-    // both switches through a guard that asks for confirmation before switching.
+    // LHDC ↔ dual-device connection and LC3 ↔ LHDC are mutually exclusive in
+    // firmware. Route all three switches through a guard that asks for
+    // confirmation before switching the conflicting feature off.
     val exclusion = rememberMutualExclusionState()
     val exclusionScope = rememberCoroutineScope()
+    val exclusionStates: ExclusionStates = mapOf(
+        MutualExclusionTarget.LHDC to (capabilities.lhdcSupported to lhdcEnabled),
+        MutualExclusionTarget.LC3 to (capabilities.lc3Supported to lc3Enabled),
+        MutualExclusionTarget.DUAL_CONNECTION to
+            (capabilities.dualConnectionSupported to dualConnectionEnabled),
+    )
     val handleLhdcChange: (Boolean) -> Unit = { wanted ->
-        if (
-            exclusion.request(
-                capabilities.lhdcSupported,
-                capabilities.dualConnectionSupported,
-                lhdcEnabled,
-                dualConnectionEnabled,
-                MutualExclusionTarget.LHDC,
-                wanted,
-            )
-        ) {
+        if (exclusion.request(exclusionStates, MutualExclusionTarget.LHDC, wanted)) {
             onLhdcChange(wanted)
         }
     }
+    val handleLc3Change: (Boolean) -> Unit = { wanted ->
+        if (exclusion.request(exclusionStates, MutualExclusionTarget.LC3, wanted)) {
+            onLc3Change(wanted)
+        }
+    }
     val handleDualChange: (Boolean) -> Unit = { wanted ->
-        if (
-            exclusion.request(
-                capabilities.lhdcSupported,
-                capabilities.dualConnectionSupported,
-                lhdcEnabled,
-                dualConnectionEnabled,
-                MutualExclusionTarget.DUAL_CONNECTION,
-                wanted,
-            )
-        ) {
+        if (exclusion.request(exclusionStates, MutualExclusionTarget.DUAL_CONNECTION, wanted)) {
             onDualConnectionChange(wanted)
         }
     }
     val applyExclusion: (MutualExclusionTarget) -> Unit = { target ->
         exclusionScope.launch {
-            if (target == MutualExclusionTarget.LHDC) {
-                onDualConnectionChange(false)
-                delay(300)
-                onLhdcChange(true)
-            } else {
-                onLhdcChange(false)
-                delay(300)
-                onDualConnectionChange(true)
+            when (target) {
+                MutualExclusionTarget.LHDC -> {
+                    onDualConnectionChange(false)
+                    delay(300)
+                    onLhdcChange(true)
+                }
+                MutualExclusionTarget.LC3 -> {
+                    onLhdcChange(false)
+                    delay(300)
+                    onLc3Change(true)
+                }
+                MutualExclusionTarget.DUAL_CONNECTION -> {
+                    onLhdcChange(false)
+                    delay(300)
+                    onDualConnectionChange(true)
+                }
             }
         }
     }
@@ -217,6 +223,8 @@ fun PodDetailPage(
                     onHeadTrackingChange = onHeadTrackingChange,
                     lhdcEnabled = lhdcEnabled,
                     onLhdcChange = handleLhdcChange,
+                    lc3Enabled = lc3Enabled,
+                    onLc3Change = handleLc3Change,
                     dualConnectionEnabled = dualConnectionEnabled,
                     onDualConnectionChange = handleDualChange,
                     capabilities = capabilities,
@@ -276,6 +284,8 @@ fun PodDetailPage(
             onHeadTrackingChange = onHeadTrackingChange,
             lhdcEnabled = lhdcEnabled,
             onLhdcChange = handleLhdcChange,
+            lc3Enabled = lc3Enabled,
+            onLc3Change = handleLc3Change,
             dualConnectionEnabled = dualConnectionEnabled,
             onDualConnectionChange = handleDualChange,
             capabilities = capabilities,
@@ -331,6 +341,8 @@ private fun LazyListScope.podControlItems(
     onHeadTrackingChange: (Boolean) -> Unit,
     lhdcEnabled: Boolean,
     onLhdcChange: (Boolean) -> Unit,
+    lc3Enabled: Boolean,
+    onLc3Change: (Boolean) -> Unit,
     dualConnectionEnabled: Boolean,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
@@ -473,8 +485,33 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    // 6. LHDC codec. Switching codec makes the headset briefly disconnect and
-    //    reconnect; show a static note so the user isn't surprised.
+    // 6. Codec group — LC3 and LHDC live in the same GAIA feature (0x10) and
+    //    are mutually exclusive. Switching codec briefly disconnects the
+    //    headset; a static note keeps the user from being surprised.
+    if (capabilities.lc3Supported || capabilities.lhdcSupported) {
+        item {
+            Text(
+                text = stringResource(R.string.control_codec_group_title),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
+    }
+    if (capabilities.lc3Supported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_lc3_title),
+                    summary = stringResource(R.string.control_lc3_reconnect_note),
+                    checked = lc3Enabled,
+                    onCheckedChange = onLc3Change,
+                    enabled = controlEnabled(pending?.lc3)
+                )
+            }
+        }
+    }
     if (capabilities.lhdcSupported) {
         item {
             Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {

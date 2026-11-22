@@ -286,7 +286,7 @@ object DeviceModels {
         inferred("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "ikuyo"), "pill_kita_ikuyo"),
         inferred("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada"), "pill_yamada_ryo"),
         inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), "punishing_gray_raven"),
-        inferred("robins", "MOONDROP robins", listOf("robins", "robin"), "robin_s_earphones"),
+        inferred("robins", "Robin's Earphones", listOf("robins", "robin", "robin's earphones"), "robin_s_earphones"),
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
         inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2", gain = gainReversed, spatial = true),
         inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed, spatial = true),

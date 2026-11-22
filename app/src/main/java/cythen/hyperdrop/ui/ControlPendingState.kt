@@ -18,6 +18,7 @@ class ControlPendingState {
     val promptTone = mutableStateOf(false)
     val headTracking = mutableStateOf(false)
     val lhdc = mutableStateOf(false)
+    val lc3 = mutableStateOf(false)
     val dualConnection = mutableStateOf(false)
 
     fun clearAll() {
@@ -31,6 +32,7 @@ class ControlPendingState {
         promptTone.value = false
         headTracking.value = false
         lhdc.value = false
+        lc3.value = false
         dualConnection.value = false
     }
 }

@@ -134,6 +134,7 @@ fun MainUI(
     val promptVolume = remember { mutableStateOf(50) }
     val headTrackingEnabled = remember { mutableStateOf(false) }
     val lhdcEnabled = remember { mutableStateOf(false) }
+    val lc3Enabled = remember { mutableStateOf(false) }
     val dualConnectionEnabled = remember { mutableStateOf(false) }
     val tabs = remember { MainTab.entries.toList() }
     var selectedTab by remember { mutableStateOf(if (openSettings) MainTab.Settings else if (openDetail) MainTab.Earphones else MainTab.Module) }
@@ -381,6 +382,11 @@ fun MainUI(
                         pending.lhdc.value = false
                     }
 
+                    OppoPodsAction.ACTION_LC3_CHANGED -> {
+                        lc3Enabled.value = p1.getBooleanExtra("enabled", lc3Enabled.value)
+                        pending.lc3.value = false
+                    }
+
                     OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED -> {
                         dualConnectionEnabled.value = p1.getBooleanExtra("enabled", dualConnectionEnabled.value)
                         pending.dualConnection.value = false
@@ -465,6 +471,7 @@ fun MainUI(
             addAction(OppoPodsAction.ACTION_PROMPT_TONE_CHANGED)
             addAction(OppoPodsAction.ACTION_HEAD_TRACKING_CHANGED)
             addAction(OppoPodsAction.ACTION_LHDC_CHANGED)
+            addAction(OppoPodsAction.ACTION_LC3_CHANGED)
             addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTED)
             addAction(OppoPodsAction.ACTION_PODS_CONNECTION_STATE_CHANGED)
@@ -620,6 +627,14 @@ fun MainUI(
         lhdcEnabled.value = enabled
         markPending(pending.lhdc)
         dispatchPodIntent(OppoPodsAction.ACTION_LHDC_SET) {
+            putExtra("enabled", enabled)
+        }
+    }
+
+    fun setLc3(enabled: Boolean) {
+        lc3Enabled.value = enabled
+        markPending(pending.lc3)
+        dispatchPodIntent(OppoPodsAction.ACTION_LC3_SET) {
             putExtra("enabled", enabled)
         }
     }
@@ -811,6 +826,8 @@ fun MainUI(
                 onHeadTrackingChange = { setHeadTracking(it) },
                 lhdcEnabled = lhdcEnabled,
                 onLhdcChange = { setLhdc(it) },
+                lc3Enabled = lc3Enabled,
+                onLc3Change = { setLc3(it) },
                 dualConnectionEnabled = dualConnectionEnabled,
                 onDualConnectionChange = { setDualConnection(it) },
                 capabilities = displayCapabilities,

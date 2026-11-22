@@ -43,6 +43,7 @@ class GenericGaiaCommandTable(
     override val queryHeadTracking: ByteArray = byteArrayOf(0x00, 0x1D, 0x24, 0x03)
     override val queryVoiceConfig: ByteArray = byteArrayOf(0x00, 0x1D, 0x1C, 0x01)
     override val queryLhdc: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x05)
+    override val queryLc3: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x01)
     override val queryDualConnection: ByteArray = byteArrayOf(0x00, 0x1D, 0x28, 0x01)
 
     // ---- SET commands ------------------------------------------------------------
@@ -85,6 +86,9 @@ class GenericGaiaCommandTable(
 
     override fun setLhdc(enabled: Boolean): ByteArray =
         byteArrayOf(0x00, 0x1D, 0x20, 0x06, if (enabled) 0x01 else 0x00)
+
+    override fun setLc3(enabled: Boolean): ByteArray =
+        byteArrayOf(0x00, 0x1D, 0x20, 0x03, if (enabled) 0x01 else 0x00)
 
     override fun setDualConnection(enabled: Boolean): ByteArray =
         byteArrayOf(0x00, 0x1D, 0x28, 0x02, if (enabled) 0x01 else 0x00)
@@ -176,10 +180,15 @@ class GenericGaiaCommandTable(
             )
         }
 
-        // LHDC: 00 1D 21 05 <0|1>; dual connection: 00 1D 29 01 <0|1>
+        // Codec feature 0x10 responses come back as cmd 0x21:
+        //   LHDC GET=0x05 / SET=0x06, LC3 GET=0x01 / SET=0x03.
+        // Dual connection: 00 1D 29 01 <0|1>.
         if (cmd == 0x21 && payload.size >= 5) {
             val v = payload[4].toInt() and 0xFF
-            if (v == 0 || v == 1) return GaiaReport.Lhdc(v == 1)
+            if (v == 0 || v == 1) {
+                if (sub == 0x05 || sub == 0x06) return GaiaReport.Lhdc(v == 1)
+                if (sub == 0x01 || sub == 0x03) return GaiaReport.Lc3(v == 1)
+            }
         }
         if (cmd == 0x29 && payload.size >= 5) {
             val v = payload[4].toInt() and 0xFF

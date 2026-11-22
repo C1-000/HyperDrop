@@ -36,6 +36,7 @@ object PuddingCommandTable : GaiaCommandTable {
     // VOICE (0x0E), CODEC_TYPE/LHDC (0x10) and ONEBRINGTWO (0x14).
     override val queryVoiceConfig: ByteArray = byteArrayOf(0x00, 0x1D, 0x1C, 0x01)
     override val queryLhdc: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x05)
+    override val queryLc3: ByteArray = byteArrayOf(0x00, 0x1D, 0x20, 0x01)
     override val queryDualConnection: ByteArray = byteArrayOf(0x00, 0x1D, 0x28, 0x01)
 
     override val ancCycle: List<Int> = listOf(2, 4, 5, 3, 1)
@@ -96,6 +97,9 @@ object PuddingCommandTable : GaiaCommandTable {
 
     override fun setLhdc(enabled: Boolean): ByteArray =
         byteArrayOf(0x00, 0x1D, 0x20, 0x06, if (enabled) 0x01 else 0x00)
+
+    override fun setLc3(enabled: Boolean): ByteArray =
+        byteArrayOf(0x00, 0x1D, 0x20, 0x03, if (enabled) 0x01 else 0x00)
 
     override fun setDualConnection(enabled: Boolean): ByteArray =
         byteArrayOf(0x00, 0x1D, 0x28, 0x02, if (enabled) 0x01 else 0x00)
@@ -161,10 +165,14 @@ object PuddingCommandTable : GaiaCommandTable {
             )
         }
 
-        // CODEC_TYPE / LHDC: 00 1D 21 05/06 <0|1>.
-        if (matchesAny(payload, 0x21, 0x05, 0x06)) {
+        // CODEC_TYPE: cmd 0x21. LHDC GET=0x05 / SET=0x06, LC3 GET=0x01 / SET=0x03.
+        if (matchesAny(payload, 0x21, 0x01, 0x03, 0x05, 0x06)) {
             val value = payload[4].toInt() and 0xFF
-            if (value == 0 || value == 1) return GaiaReport.Lhdc(value == 1)
+            if (value == 0 || value == 1) {
+                val sub = payload[3].toInt() and 0xFF
+                if (sub == 0x05 || sub == 0x06) return GaiaReport.Lhdc(value == 1)
+                if (sub == 0x01 || sub == 0x03) return GaiaReport.Lc3(value == 1)
+            }
         }
 
         // ONEBRINGTWO / dual connection: 00 1D 29 01/02 <0|1>.

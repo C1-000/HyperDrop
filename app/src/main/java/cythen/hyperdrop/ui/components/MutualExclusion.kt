@@ -18,8 +18,21 @@ import cythen.hyperdrop.R
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 
-/** The two codec features that the firmware cannot keep enabled at the same time. */
-enum class MutualExclusionTarget { LHDC, DUAL_CONNECTION }
+/**
+ * Feature toggles that the firmware cannot keep enabled at the same time:
+ * LHDC ↔ dual-device connection, and LC3 ↔ LHDC (one codec at a time).
+ */
+enum class MutualExclusionTarget { LHDC, LC3, DUAL_CONNECTION }
+
+/** Pairs of toggles that cannot both be on. */
+private fun targetsConflict(a: MutualExclusionTarget, b: MutualExclusionTarget): Boolean =
+    (a == MutualExclusionTarget.LHDC && b == MutualExclusionTarget.DUAL_CONNECTION) ||
+        (a == MutualExclusionTarget.DUAL_CONNECTION && b == MutualExclusionTarget.LHDC) ||
+        (a == MutualExclusionTarget.LC3 && b == MutualExclusionTarget.LHDC) ||
+        (a == MutualExclusionTarget.LHDC && b == MutualExclusionTarget.LC3)
+
+/** `first` = supported by the device, `second` = currently on. */
+typealias ExclusionStates = Map<MutualExclusionTarget, Pair<Boolean, Boolean>>
 
 /**
  * Decides whether a requested toggle can be sent straight away, or whether the
@@ -31,19 +44,12 @@ class MutualExclusionState {
         private set
 
     /**
-     * Returns true when [wanted] can be applied immediately.
-     * When the opposite feature is currently on, records the pending target and
-     * returns false so the caller must not send the command yet.
+     * Returns true when [wanted] can be applied immediately. When a conflicting
+     * feature is currently on, records the pending target and returns false so the
+     * caller must not send the command yet.
      */
-    fun request(
-        lhdcSupported: Boolean,
-        dualSupported: Boolean,
-        lhdcOn: Boolean,
-        dualOn: Boolean,
-        target: MutualExclusionTarget,
-        wanted: Boolean,
-    ): Boolean {
-        if (mutualExclusionDeferred(lhdcSupported, dualSupported, lhdcOn, dualOn, target, wanted)) {
+    fun request(states: ExclusionStates, target: MutualExclusionTarget, wanted: Boolean): Boolean {
+        if (mutualExclusionDeferred(states, target, wanted)) {
             pendingTarget = target
             return false
         }
@@ -59,9 +65,24 @@ class MutualExclusionState {
 fun rememberMutualExclusionState(): MutualExclusionState = remember { MutualExclusionState() }
 
 /**
- * Pure decision helper (no Compose state) so the mutual-exclusion rule can be
- * unit-tested: returns true when enabling [target] must be deferred to a
- * confirmation dialog instead of being sent straight away.
+ * Generic decision helper (no Compose state, unit-testable): true when enabling
+ * [target] must be deferred to a confirmation dialog. A conflict only counts when
+ * both features are supported and the other one is currently on; a declared
+ * unsupported feature is never treated as active.
+ */
+fun mutualExclusionDeferred(
+    states: ExclusionStates,
+    target: MutualExclusionTarget,
+    wanted: Boolean,
+): Boolean {
+    if (!wanted || states[target]?.first != true) return false
+    return states.any { (other, state) ->
+        other != target && state.first && state.second && targetsConflict(target, other)
+    }
+}
+
+/**
+ * Backwards-compatible two-feature form used by existing callers/tests (LHDC ↔ dual).
  */
 fun mutualExclusionDeferred(
     lhdcSupported: Boolean,
@@ -70,10 +91,14 @@ fun mutualExclusionDeferred(
     dualOn: Boolean,
     target: MutualExclusionTarget,
     wanted: Boolean,
-): Boolean {
-    if (!wanted || !lhdcSupported || !dualSupported) return false
-    return if (target == MutualExclusionTarget.LHDC) dualOn else lhdcOn
-}
+): Boolean = mutualExclusionDeferred(
+    mapOf(
+        MutualExclusionTarget.LHDC to (lhdcSupported to lhdcOn),
+        MutualExclusionTarget.DUAL_CONNECTION to (dualSupported to dualOn),
+    ),
+    target,
+    wanted,
+)
 
 /**
  * Confirmation dialog shown when enabling a feature that conflicts with the one
@@ -87,9 +112,13 @@ fun MutualExclusionDialog(
 ) {
     val target = state.pendingTarget
     OverlayDialog(
-        title = stringResource(R.string.conflict_lhdc_dual_title),
+        title = stringResource(
+            if (target == MutualExclusionTarget.LC3) R.string.conflict_lc3_lhdc_title
+            else R.string.conflict_lhdc_dual_title
+        ),
         summary = when (target) {
             MutualExclusionTarget.LHDC -> stringResource(R.string.conflict_lhdc_dual_message_lhdc)
+            MutualExclusionTarget.LC3 -> stringResource(R.string.conflict_lc3_lhdc_message_lc3)
             MutualExclusionTarget.DUAL_CONNECTION -> stringResource(R.string.conflict_lhdc_dual_message_dual)
             null -> ""
         },

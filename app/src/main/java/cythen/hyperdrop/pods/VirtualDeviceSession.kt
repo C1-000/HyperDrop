@@ -52,6 +52,7 @@ object VirtualDeviceSession {
     private var currentPromptIndex = 0
     private var currentHeadTrackingEnabled = false
     private var currentLhdcEnabled = false
+    private var currentLc3Enabled = false
     private var currentDualConnectionEnabled = false
     private var currentSpatialAudioMode = 0
     private var currentTransparencyVocalEnhancement = false
@@ -146,6 +147,7 @@ object VirtualDeviceSession {
 
             OppoPodsAction.ACTION_HEAD_TRACKING_SET -> setHeadTracking(intent.getBooleanExtra("enabled", false))
             OppoPodsAction.ACTION_LHDC_SET -> setLhdc(intent.getBooleanExtra("enabled", false))
+            OppoPodsAction.ACTION_LC3_SET -> setLc3(intent.getBooleanExtra("enabled", false))
             OppoPodsAction.ACTION_DUAL_CONNECTION_SET -> setDualConnection(intent.getBooleanExtra("enabled", false))
             OppoPodsAction.ACTION_CYCLE_ANC -> cycleAnc()
             OppoPodsAction.ACTION_RFCOMM_LOG_CONNECT -> RfcommLog.setEnabled(true, appContext)
@@ -191,6 +193,7 @@ object VirtualDeviceSession {
         currentPromptIndex = 0
         currentHeadTrackingEnabled = false
         currentLhdcEnabled = false
+        currentLc3Enabled = false
         currentDualConnectionEnabled = false
         currentSpatialAudioMode = 0
         currentTransparencyVocalEnhancement = false
@@ -225,6 +228,7 @@ object VirtualDeviceSession {
         emitPromptTone()
         emitHeadTracking()
         emitLhdc()
+        emitLc3()
         emitDualConnection()
         emitBattery()
     }
@@ -350,6 +354,18 @@ object VirtualDeviceSession {
         emitLhdc()
     }
 
+    private fun setLc3(enabled: Boolean) {
+        val table = commandTable() ?: return
+        val packet = table.setLc3(enabled)
+        if (packet == null) {
+            logUnsupported("setLc3($enabled)")
+            return
+        }
+        logTx(packet)
+        currentLc3Enabled = enabled
+        emitLc3()
+    }
+
     private fun setDualConnection(enabled: Boolean) {
         val table = commandTable() ?: return
         val packet = table.setDualConnection(enabled)
@@ -468,6 +484,13 @@ object VirtualDeviceSession {
         send(Intent(OppoPodsAction.ACTION_LHDC_CHANGED)) {
             putExtra("address", activeDevice?.address ?: "")
             putExtra("enabled", currentLhdcEnabled)
+        }
+    }
+
+    private fun emitLc3() {
+        send(Intent(OppoPodsAction.ACTION_LC3_CHANGED)) {
+            putExtra("address", activeDevice?.address ?: "")
+            putExtra("enabled", currentLc3Enabled)
         }
     }
 

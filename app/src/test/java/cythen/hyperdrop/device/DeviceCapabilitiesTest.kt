@@ -264,6 +264,42 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
+    fun `codec feature observation opens both LC3 and LHDC`() {
+        // GAIA feature 16 only signals that codec control exists; the bit-level
+        // report cannot tell LC3 from LHDC, so both are opened conservatively.
+        val observed = DeviceRegistry.resolveCapabilities(
+            DeviceCapabilities.NONE,
+            setOf(CapabilityProfile.F_CODEC_TYPE),
+        )
+        assertTrue(observed.lhdcSupported)
+        assertTrue(observed.lc3Supported)
+    }
+
+    @Test
+    fun `LC3 codec command bytes and parse are wired on both tables`() {
+        val generic = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
+        val pudding = DeviceModels.pudding.commandTable
+        listOf(generic, pudding).forEach { table ->
+            assertEquals("00 1D 20 01", table.queryLc3!!.joinToString(" ") { "%02X".format(it) })
+            assertEquals("00 1D 20 03 01", table.setLc3(true)!!.joinToString(" ") { "%02X".format(it) })
+            assertEquals("00 1D 20 03 00", table.setLc3(false)!!.joinToString(" ") { "%02X".format(it) })
+            assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x01, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.Lc3)
+            assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x03, 0)) is cythen.hyperdrop.device.protocol.GaiaReport.Lc3)
+            // LHDC subs still decode as LHDC, not LC3.
+            assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x05, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.Lhdc)
+        }
+    }
+
+    @Test
+    fun `robin models match by the Robin's Earphones name`() {
+        val robin = DeviceModels.match("ROBIN'S EARPHONES")
+        assertEquals("robins", robin?.id)
+        assertEquals("Robin's Earphones", robin?.displayName)
+        assertEquals("robins", DeviceModels.match("MOONDROP robins")?.id)
+        assertEquals("robins", DeviceModels.match("robin")?.id)
+    }
+
+    @Test
     fun `battery level masks the high charging bit`() {
         val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
         // Left=0x80|85 => level 85 with a stray charging bit must still be reported.

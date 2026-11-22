@@ -32,11 +32,13 @@ object OppoPodsAction {
     const val ACTION_PROMPT_VOLUME_SET = "cythen.hyperdrop.action.prompt_volume_set"
     const val ACTION_HEAD_TRACKING_SET = "cythen.hyperdrop.action.head_tracking_set"
     const val ACTION_LHDC_SET = "cythen.hyperdrop.action.lhdc_set"
+    const val ACTION_LC3_SET = "cythen.hyperdrop.action.lc3_set"
     const val ACTION_DUAL_CONNECTION_SET = "cythen.hyperdrop.action.dual_connection_set"
     // Echo broadcasts carrying the device-reported (real) state back to the app UI.
     const val ACTION_PROMPT_TONE_CHANGED = "cythen.hyperdrop.action.prompt_tone_changed"
     const val ACTION_HEAD_TRACKING_CHANGED = "cythen.hyperdrop.action.head_tracking_changed"
     const val ACTION_LHDC_CHANGED = "cythen.hyperdrop.action.lhdc_changed"
+    const val ACTION_LC3_CHANGED = "cythen.hyperdrop.action.lc3_changed"
     const val ACTION_DUAL_CONNECTION_CHANGED = "cythen.hyperdrop.action.dual_connection_changed"
     const val ACTION_CYCLE_ANC = "cythen.hyperdrop.action.cycle_anc"
     const val ACTION_RFCOMM_LOG_CONNECT = "cythen.hyperdrop.action.rfcomm_log_connect"

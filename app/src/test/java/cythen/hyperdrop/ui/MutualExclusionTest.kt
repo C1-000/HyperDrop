@@ -51,4 +51,23 @@ class MutualExclusionTest {
                 MutualExclusionTarget.DUAL_CONNECTION, wanted = true)
         )
     }
+
+    @Test
+    fun `LC3 and LHDC defer each other but not dual connection`() {
+        val states = mapOf(
+            MutualExclusionTarget.LHDC to (true to true),
+            MutualExclusionTarget.LC3 to (true to false),
+            MutualExclusionTarget.DUAL_CONNECTION to (true to false),
+        )
+        assertTrue(mutualExclusionDeferred(states, MutualExclusionTarget.LC3, wanted = true))
+        // LC3 does not conflict with dual connection (with LHDC off).
+        val statesDualOn = states + mapOf(
+            MutualExclusionTarget.LHDC to (true to false),
+            MutualExclusionTarget.DUAL_CONNECTION to (true to true),
+        )
+        assertFalse(mutualExclusionDeferred(statesDualOn, MutualExclusionTarget.LC3, wanted = true))
+        // Enabling LC3 when LHDC is off is immediate.
+        val statesLhdcOff = states + (MutualExclusionTarget.LHDC to (true to false))
+        assertFalse(mutualExclusionDeferred(statesLhdcOff, MutualExclusionTarget.LC3, wanted = true))
+    }
 }
