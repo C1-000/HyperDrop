@@ -4,6 +4,7 @@ import cythen.hyperdrop.R
 import cythen.hyperdrop.device.protocol.AncPathKind
 import cythen.hyperdrop.pods.AncImplementation
 import cythen.hyperdrop.pods.NoiseControlMode
+import cythen.hyperdrop.pods.isNoiseCancellation
 
 /** How a model talks to the earbuds. Only RFCOMM/GAIA v4 is implemented in this build. */
 enum class PodTransport { BLE_GAIA, RFCOMM_GAIA, BLE_SRC_9ECA }
@@ -124,10 +125,11 @@ object DeviceModels {
         dualConnection: Boolean,
         batteryForm: BatteryForm,
         ldac: Boolean = false,
+        lc3: Boolean = false,
     ): CapabilityProfile {
         val sig = listOf(
             modes.joinToString(",") { it.mode.name }, spatial, headTracking, gain, led,
-            promptTone, lhdc, ldac, dualConnection, batteryForm.name,
+            promptTone, lhdc, lc3, ldac, dualConnection, batteryForm.name,
         ).joinToString("|")
         return capCache.getOrPut(sig) {
             CapabilityProfile(
@@ -144,7 +146,7 @@ object DeviceModels {
                 promptToneSupported = promptTone,
                 promptVolumeSupported = promptTone,
                 lhdcSupported = lhdc,
-                lc3Supported = false,
+                lc3Supported = lc3,
                 ldacSupported = ldac,
                 dualConnectionSupported = dualConnection,
                 batteryForm = batteryForm,
@@ -215,12 +217,18 @@ object DeviceModels {
         dualConnection: Boolean = false,
         batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY,
         ldac: Boolean = false,
+        lc3: Boolean = false,
         verified: Boolean = false,
     ): DeviceProfileSpec {
         val (setMap, getMap) = ancMaps(pairs, getSequential = path == AncPathKind.AUDIO_CURATION)
         val control = genericControl(path, setMap, getMap, gain ?: gainIdentity)
+        // ancModes drives the geometry-only "ANC strength" tab. It must list ONLY the
+        // noise-cancellation flavours (like PUDDING's basic/adaptive/wind), never OFF or
+        // TRANSPARENCY — those two are controlled by the top three buttons. The full
+        // `pairs` (including OFF/TRANSPARENCY) still feed the wire setMap/getMap above.
+        val ancFlavours = pairs.map { it.first }.filter { it.isNoiseCancellation() }
         val caps = inferredCapability(
-            modes = ancOptions(pairs.map { it.first }),
+            modes = ancOptions(ancFlavours),
             spatial = spatial,
             headTracking = headTracking,
             gain = gain != null,
@@ -230,6 +238,7 @@ object DeviceModels {
             dualConnection = dualConnection,
             batteryForm = batteryForm,
             ldac = ldac,
+            lc3 = lc3,
         )
         return DeviceProfileSpec(
             id = id,
@@ -246,7 +255,7 @@ object DeviceModels {
     /** Conservative declaration for a model with no real-hardware evidence. */
     private val conservativeCaps: CapabilityProfile
         get() = inferredCapability(
-            modes = ancOptions(ac4Pairs.map { it.first }),
+            modes = ancOptions(ac4Pairs.map { it.first }.filter { it.isNoiseCancellation() }),
             spatial = false, headTracking = false, gain = false, led = false,
             promptTone = false, lhdc = false, dualConnection = false,
             batteryForm = BatteryForm.TWS_THREE_WAY,
@@ -269,10 +278,11 @@ object DeviceModels {
         inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), "moondrop_edge_2", pairs = ac3Pairs, gain = gainIdentity, batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), "moondrop_evo_2"),
         // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (the
-        // ac4Pairs + AUDIO_CURATION default), reversed gain, no LED. Per real-device
-        // feedback neither Golden Ages (1979) nor Golden Ages 2 (梦回2) has spatial audio.
-        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed, verified = true),
-        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, promptTone = true, verified = true),
+        // ac4Pairs + AUDIO_CURATION default), reversed gain, no LED. Both 梦回 (Golden Ages)
+        // and 梦回2 (GA2) expose LC3 + LDAC codecs. 梦回2 additionally has spatial audio
+        // (per real-device feedback; the earlier removal was based on a misread).
+        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed, lc3 = true, ldac = true, verified = true),
+        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, promptTone = true, lc3 = true, ldac = true, spatial = true, verified = true),
         inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), "moondrop_littlewhite", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), "moondrop_mm3a"),
         inferred("maca", "MOONDROP MACA", listOf("maca"), "moondrop_moca", lhdc = true, spatial = true),

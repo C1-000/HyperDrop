@@ -116,8 +116,8 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 
 | 机型 | 连接 | ANC 路径与映射 | 其它能力 | 备注 |
 |---|---|---|---|---|
-| 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | 三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量；**无空间音频**（真机反馈，MoonEar 旧档案的 hasSpatial=true 已过时） | `PROFILES` + `DC_PROFILES` |
-| 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 同上（无空间音频） | 验证通过 |
+| 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | 三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量；**有空间音频**（真机反馈）、**LC3 + LDAC 编码** | `PROFILES` + `DC_PROFILES` |
+| 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 三档增益、无 LED；**LC3 + LDAC 编码** | 验证通过 |
 | 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED | 涉及 9ECA 私有协议 |
 | 太空漫游2 ULTRA | 国产 SoC | 仅记"实机验证通过"，无公开控制命令；HyperDrop 按保守推断处理 | — | `verified=false`，未纳入实机验证档案 |
 | U.C.T.S (MD-OWS-014) | GAIA | 开放式耳机，**硬件无降噪** | 左右耳电量正常 | 无 ANC 能力 |

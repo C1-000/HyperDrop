@@ -139,7 +139,12 @@ fun AncSwitch(
             )
         }
 
-        if (ancModes.isNotEmpty() && ancModes.any { it.mode == ancStatus }) {
+        // The contour tab row is the "ANC strength / 档位" selector, NOT the mode selector.
+        // It must appear only while a noise-cancellation flavour is active, and only when
+        // there is more than one level to choose from. ancModes is now guaranteed (by the
+        // device profiles) to contain ONLY noise-cancellation flavours — OFF and
+        // TRANSPARENCY are driven by the three buttons above. This mirrors PUDDING's logic.
+        if (ancModes.size > 1 && ancModes.any { it.mode == ancStatus }) {
             val modes = ancModes.map { it.mode }
             val tabs = ancModes.map { stringResource(it.labelRes) }
 

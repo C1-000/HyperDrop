@@ -7,6 +7,7 @@ import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.PuddingProfile
 import cythen.hyperdrop.device.StandardBluetoothProfile
 import cythen.hyperdrop.pods.NoiseControlMode
+import cythen.hyperdrop.pods.isNoiseCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -102,16 +103,21 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun `verified profiles carry MoonEar real-device capabilities`() {
-        // GA2 / Golden Ages: AudioCuration 4-gang, reversed gain, no LED.
-        // Per real-device feedback neither has spatial audio (MoonEar's stale profile
-        // claimed GA2 did) — assert false so a regression is caught.
+        // GA2 / Golden Ages: AudioCuration 4-gang, reversed gain, no LED. Both expose
+        // LC3 + LDAC codecs; GA2 (梦回2) also has spatial audio per real-device feedback.
         val ga2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Golden Ages 2")
-        assertFalse(ga2.spatialAudioSupported)
+        assertTrue(ga2.spatialAudioSupported)
+        assertTrue(ga2.lc3Supported)
+        assertTrue(ga2.ldacSupported)
         val ga1979 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Golden Ages")
-        assertFalse(ga1979.spatialAudioSupported)
+        assertTrue(ga1979.lc3Supported)
+        assertTrue(ga1979.ldacSupported)
         assertTrue(ga2.gainSupported)
         assertFalse(ga2.ledSupported)
-        assertEquals(4, ga2.ancModes.size)
+        // ancModes lists only ANC flavours (NC + wind); OFF/TRANSPARENCY stay in the
+        // wire setMap and are driven by the top three buttons, not the strength tab.
+        assertEquals(2, ga2.ancModes.size)
+        assertTrue(ga2.ancModes.all { it.mode.isNoiseCancellation() })
         // Space Travel 2: reversed gain, no spatial, no LED.
         val st2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Space Travel 2")
         assertTrue(st2.gainSupported)
@@ -159,7 +165,9 @@ class DeviceCapabilitiesTest {
     fun `inferred model caps carry ANC path and gain mapping`() {
         val edge = DeviceRegistry.profileById("edge")
         assertTrue(edge.capabilities.gainSupported)
-        assertEquals(3, edge.capabilities.ancModes.size)
+        // edge uses ac3Pairs (OFF/NC/TRANSPARENCY); only the NC flavour belongs in ancModes.
+        assertEquals(1, edge.capabilities.ancModes.size)
+        assertEquals(NoiseControlMode.NOISE_CANCELLATION, edge.capabilities.ancModes[0].mode)
         // Wire maps now live in the control profile, not capabilities.
         val puddingControl = DeviceModels.pudding.controlProfile
         assertEquals(0, puddingControl.ancSetMap[1])  // UI status 1 = OFF -> wire 0
