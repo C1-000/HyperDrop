@@ -90,7 +90,35 @@ class DeviceCapabilitiesTest {
         assertEquals("fallback", DeviceModels.match("MOONDROP something new")?.id)
         // Non-MOONDROP name is not a supported device.
         assertNull(DeviceModels.match("Some random headphones"))
-        assertEquals(2, DeviceModels.models.count { it.verified })
+        assertEquals(8, DeviceModels.models.count { it.verified })
+        // The seven MoonEar real-device verified models (+ MIRAGE linked variant).
+        listOf("golden_ages", "golden_ages_2", "space_travel_2", "space_travel_2_ultra",
+            "moondrop_u_c_t_s", "me_163_komet_moca", "pudding").forEach { id ->
+            assertTrue("$id must be verified", DeviceRegistry.profileById(id).verified)
+        }
+    }
+
+    @Test
+    fun `verified profiles carry MoonEar real-device capabilities`() {
+        // GA2 / Golden Ages: AudioCuration 4-gang, spatial audio, reversed gain, no LED.
+        val ga2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Golden Ages 2")
+        assertTrue(ga2.spatialAudioSupported)
+        assertTrue(ga2.gainSupported)
+        assertFalse(ga2.ledSupported)
+        assertEquals(4, ga2.ancModes.size)
+        // Space Travel 2: reversed gain, no spatial, no LED.
+        val st2 = DeviceRegistry.detectDeviceCapabilities("MOONDROP Space Travel 2")
+        assertTrue(st2.gainSupported)
+        assertFalse(st2.spatialAudioSupported)
+        assertFalse(st2.ledSupported)
+        // U.C.T.S: open-fit, hardware has NO ANC.
+        val ucts = DeviceRegistry.detectDeviceCapabilities("Moondrop U.C.T.S.")
+        assertTrue(ucts.ancModes.isEmpty())
+        // MOCA: equal gain + LED, no spatial.
+        val moca = DeviceRegistry.detectDeviceCapabilities("Me 163 Komet MOCA")
+        assertTrue(moca.gainSupported)
+        assertTrue(moca.ledSupported)
+        assertFalse(moca.spatialAudioSupported)
     }
 
     @Test
@@ -134,9 +162,9 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `model catalogue has 45 unique image keys with only two verified`() {
+    fun `model catalogue has 45 unique image keys with eight verified`() {
         assertEquals(45, DeviceModels.models.size)
-        assertEquals(2, DeviceModels.models.count { it.verified })
+        assertEquals(8, DeviceModels.models.count { it.verified })
         val keys = DeviceModels.models.map { it.imageKey }
         assertEquals("imageKey must be unique", keys.size, keys.toSet().size)
         // Every imageKey except the deliberate fallback resolves to a bundled set.
@@ -264,15 +292,16 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `codec feature observation opens both LC3 and LHDC`() {
+    fun `codec feature observation opens LC3, LDAC and LHDC`() {
         // GAIA feature 16 only signals that codec control exists; the bit-level
-        // report cannot tell LC3 from LHDC, so both are opened conservatively.
+        // report cannot tell the codecs apart, so all three open conservatively.
         val observed = DeviceRegistry.resolveCapabilities(
             DeviceCapabilities.NONE,
             setOf(CapabilityProfile.F_CODEC_TYPE),
         )
         assertTrue(observed.lhdcSupported)
         assertTrue(observed.lc3Supported)
+        assertTrue(observed.ldacSupported)
     }
 
     @Test
@@ -287,6 +316,19 @@ class DeviceCapabilitiesTest {
             assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x03, 0)) is cythen.hyperdrop.device.protocol.GaiaReport.Lc3)
             // LHDC subs still decode as LHDC, not LC3.
             assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x05, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.Lhdc)
+        }
+    }
+
+    @Test
+    fun `LDAC codec command bytes and parse are wired on both tables`() {
+        val generic = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
+        val pudding = DeviceModels.pudding.commandTable
+        listOf(generic, pudding).forEach { table ->
+            assertEquals("00 1D 20 02", table.queryLdac!!.joinToString(" ") { "%02X".format(it) })
+            assertEquals("00 1D 20 04 01", table.setLdac(true)!!.joinToString(" ") { "%02X".format(it) })
+            assertEquals("00 1D 20 04 00", table.setLdac(false)!!.joinToString(" ") { "%02X".format(it) })
+            assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x02, 1)) is cythen.hyperdrop.device.protocol.GaiaReport.Ldac)
+            assertTrue(table.parse(byteArrayOf(0, 0x1D, 0x21, 0x04, 0)) is cythen.hyperdrop.device.protocol.GaiaReport.Ldac)
         }
     }
 

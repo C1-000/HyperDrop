@@ -31,6 +31,7 @@ data class DeviceCapabilities(
     val promptVolumeSupported: Boolean = false,
     val lhdcSupported: Boolean = false,
     val lc3Supported: Boolean = false,
+    val ldacSupported: Boolean = false,
     val dualConnectionSupported: Boolean = false,
     /** How the battery card renders. Display-only; the battery query is unchanged. */
     val batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY,

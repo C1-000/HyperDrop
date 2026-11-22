@@ -135,6 +135,9 @@
     <string name="control_lc3_title">LC3 编码</string>
     <string name="control_lc3_summary">开启低复杂度 LC3 编码</string>
     <string name="control_lc3_reconnect_note">切换 LC3 时耳机会短暂断开并自动重连</string>
+    <string name="control_ldac_title">LDAC 编码</string>
+    <string name="control_ldac_summary">开启高解析度 LDAC 编码</string>
+    <string name="control_ldac_reconnect_note">切换 LDAC 时耳机会短暂断开并自动重连</string>
     <string name="control_lhdc_title">LHDC 编码</string>
     <string name="control_lhdc_summary">开启高解析度 LHDC 编码</string>
     <string name="control_lhdc_reconnect_note">切换 LHDC 时耳机会短暂断开并自动重连</string>
@@ -146,6 +149,8 @@
     <string name="conflict_lhdc_dual_message_dual">开启双设备连接会关闭 LHDC。</string>
     <string name="conflict_lc3_lhdc_title">LC3 与 LHDC 不能同时开启</string>
     <string name="conflict_lc3_lhdc_message_lc3">开启 LC3 会关闭 LHDC。</string>
+    <string name="conflict_ldac_title">同时间只能开启一种编码</string>
+    <string name="conflict_ldac_message">开启 LDAC 会关闭当前已开启的编码。</string>
     <string name="conflict_switch">切换</string>
 
     <string name="debug_title">调试选项</string>

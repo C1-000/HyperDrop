@@ -20,16 +20,20 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 
 /**
  * Feature toggles that the firmware cannot keep enabled at the same time:
- * LHDC ↔ dual-device connection, and LC3 ↔ LHDC (one codec at a time).
+ * codecs LC3 / LDAC / LHDC are mutually exclusive (one codec at a time), and
+ * LHDC additionally conflicts with dual-device connection.
  */
-enum class MutualExclusionTarget { LHDC, LC3, DUAL_CONNECTION }
+enum class MutualExclusionTarget { LHDC, LC3, LDAC, DUAL_CONNECTION }
 
 /** Pairs of toggles that cannot both be on. */
-private fun targetsConflict(a: MutualExclusionTarget, b: MutualExclusionTarget): Boolean =
-    (a == MutualExclusionTarget.LHDC && b == MutualExclusionTarget.DUAL_CONNECTION) ||
-        (a == MutualExclusionTarget.DUAL_CONNECTION && b == MutualExclusionTarget.LHDC) ||
-        (a == MutualExclusionTarget.LC3 && b == MutualExclusionTarget.LHDC) ||
-        (a == MutualExclusionTarget.LHDC && b == MutualExclusionTarget.LC3)
+private fun targetsConflict(a: MutualExclusionTarget, b: MutualExclusionTarget): Boolean {
+    // All codecs are mutually exclusive.
+    val codecs = setOf(MutualExclusionTarget.LHDC, MutualExclusionTarget.LC3, MutualExclusionTarget.LDAC)
+    if (a in codecs && b in codecs) return true
+    // LHDC also conflicts with dual-device connection.
+    return (a == MutualExclusionTarget.LHDC && b == MutualExclusionTarget.DUAL_CONNECTION) ||
+        (a == MutualExclusionTarget.DUAL_CONNECTION && b == MutualExclusionTarget.LHDC)
+}
 
 /** `first` = supported by the device, `second` = currently on. */
 typealias ExclusionStates = Map<MutualExclusionTarget, Pair<Boolean, Boolean>>
@@ -113,12 +117,16 @@ fun MutualExclusionDialog(
     val target = state.pendingTarget
     OverlayDialog(
         title = stringResource(
-            if (target == MutualExclusionTarget.LC3) R.string.conflict_lc3_lhdc_title
-            else R.string.conflict_lhdc_dual_title
+            when (target) {
+                MutualExclusionTarget.LC3 -> R.string.conflict_lc3_lhdc_title
+                MutualExclusionTarget.LDAC -> R.string.conflict_ldac_title
+                else -> R.string.conflict_lhdc_dual_title
+            }
         ),
         summary = when (target) {
             MutualExclusionTarget.LHDC -> stringResource(R.string.conflict_lhdc_dual_message_lhdc)
             MutualExclusionTarget.LC3 -> stringResource(R.string.conflict_lc3_lhdc_message_lc3)
+            MutualExclusionTarget.LDAC -> stringResource(R.string.conflict_ldac_message)
             MutualExclusionTarget.DUAL_CONNECTION -> stringResource(R.string.conflict_lhdc_dual_message_dual)
             null -> ""
         },

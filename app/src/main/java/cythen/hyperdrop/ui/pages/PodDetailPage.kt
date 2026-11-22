@@ -57,7 +57,6 @@ import cythen.hyperdrop.pods.EqPreset
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun PodDetailPage(
@@ -93,6 +92,8 @@ fun PodDetailPage(
     onLhdcChange: (Boolean) -> Unit = {},
     lc3Enabled: Boolean = false,
     onLc3Change: (Boolean) -> Unit = {},
+    ldacEnabled: Boolean = false,
+    onLdacChange: (Boolean) -> Unit = {},
     dualConnectionEnabled: Boolean = false,
     onDualConnectionChange: (Boolean) -> Unit = {},
     capabilities: DeviceCapabilities = DeviceCapabilities.NONE,
@@ -109,14 +110,15 @@ fun PodDetailPage(
     val builtinBoxRes = DeviceImageCatalog.resolve(deviceImageKey).box
     val imagePainter = rememberPodImagePainter(boxImagePath, builtinBoxRes)
 
-    // LHDC ↔ dual-device connection and LC3 ↔ LHDC are mutually exclusive in
-    // firmware. Route all three switches through a guard that asks for
-    // confirmation before switching the conflicting feature off.
+    // Codecs (LC3 / LDAC / LHDC) are mutually exclusive in firmware, and LHDC
+    // additionally conflicts with dual-device connection. Route all switches
+    // through a guard that asks before switching the conflicting feature off.
     val exclusion = rememberMutualExclusionState()
     val exclusionScope = rememberCoroutineScope()
     val exclusionStates: ExclusionStates = mapOf(
         MutualExclusionTarget.LHDC to (capabilities.lhdcSupported to lhdcEnabled),
         MutualExclusionTarget.LC3 to (capabilities.lc3Supported to lc3Enabled),
+        MutualExclusionTarget.LDAC to (capabilities.ldacSupported to ldacEnabled),
         MutualExclusionTarget.DUAL_CONNECTION to
             (capabilities.dualConnectionSupported to dualConnectionEnabled),
     )
@@ -130,6 +132,11 @@ fun PodDetailPage(
             onLc3Change(wanted)
         }
     }
+    val handleLdacChange: (Boolean) -> Unit = { wanted ->
+        if (exclusion.request(exclusionStates, MutualExclusionTarget.LDAC, wanted)) {
+            onLdacChange(wanted)
+        }
+    }
     val handleDualChange: (Boolean) -> Unit = { wanted ->
         if (exclusion.request(exclusionStates, MutualExclusionTarget.DUAL_CONNECTION, wanted)) {
             onDualConnectionChange(wanted)
@@ -137,16 +144,31 @@ fun PodDetailPage(
     }
     val applyExclusion: (MutualExclusionTarget) -> Unit = { target ->
         exclusionScope.launch {
+            // Turn off every conflicting feature that is currently on, then enable target.
+            val onCodecs = listOf(
+                MutualExclusionTarget.LHDC, MutualExclusionTarget.LC3, MutualExclusionTarget.LDAC,
+            ).filter { exclusionStates[it]?.second == true }
             when (target) {
-                MutualExclusionTarget.LHDC -> {
-                    onDualConnectionChange(false)
+                MutualExclusionTarget.LHDC, MutualExclusionTarget.LC3, MutualExclusionTarget.LDAC -> {
+                    onCodecs.filter { it != target }.forEach { other ->
+                        when (other) {
+                            MutualExclusionTarget.LHDC -> onLhdcChange(false)
+                            MutualExclusionTarget.LC3 -> onLc3Change(false)
+                            MutualExclusionTarget.LDAC -> onLdacChange(false)
+                            else -> Unit
+                        }
+                    }
+                    // LHDC also conflicts with dual connection.
+                    if (target == MutualExclusionTarget.LHDC && exclusionStates[MutualExclusionTarget.DUAL_CONNECTION]?.second == true) {
+                        onDualConnectionChange(false)
+                    }
                     delay(300)
-                    onLhdcChange(true)
-                }
-                MutualExclusionTarget.LC3 -> {
-                    onLhdcChange(false)
-                    delay(300)
-                    onLc3Change(true)
+                    when (target) {
+                        MutualExclusionTarget.LHDC -> onLhdcChange(true)
+                        MutualExclusionTarget.LC3 -> onLc3Change(true)
+                        MutualExclusionTarget.LDAC -> onLdacChange(true)
+                        MutualExclusionTarget.DUAL_CONNECTION -> Unit
+                    }
                 }
                 MutualExclusionTarget.DUAL_CONNECTION -> {
                     onLhdcChange(false)
@@ -225,6 +247,8 @@ fun PodDetailPage(
                     onLhdcChange = handleLhdcChange,
                     lc3Enabled = lc3Enabled,
                     onLc3Change = handleLc3Change,
+                    ldacEnabled = ldacEnabled,
+                    onLdacChange = handleLdacChange,
                     dualConnectionEnabled = dualConnectionEnabled,
                     onDualConnectionChange = handleDualChange,
                     capabilities = capabilities,
@@ -286,6 +310,8 @@ fun PodDetailPage(
             onLhdcChange = handleLhdcChange,
             lc3Enabled = lc3Enabled,
             onLc3Change = handleLc3Change,
+            ldacEnabled = ldacEnabled,
+            onLdacChange = handleLdacChange,
             dualConnectionEnabled = dualConnectionEnabled,
             onDualConnectionChange = handleDualChange,
             capabilities = capabilities,
@@ -343,6 +369,8 @@ private fun LazyListScope.podControlItems(
     onLhdcChange: (Boolean) -> Unit,
     lc3Enabled: Boolean,
     onLc3Change: (Boolean) -> Unit,
+    ldacEnabled: Boolean,
+    onLdacChange: (Boolean) -> Unit,
     dualConnectionEnabled: Boolean,
     onDualConnectionChange: (Boolean) -> Unit,
     capabilities: DeviceCapabilities,
@@ -485,20 +513,9 @@ private fun LazyListScope.podControlItems(
         }
     }
 
-    // 6. Codec group — LC3 and LHDC live in the same GAIA feature (0x10) and
-    //    are mutually exclusive. Switching codec briefly disconnects the
-    //    headset; a static note keeps the user from being surprised.
-    if (capabilities.lc3Supported || capabilities.lhdcSupported) {
-        item {
-            Text(
-                text = stringResource(R.string.control_codec_group_title),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-    }
+    // 6. Codec controls — LC3 / LDAC / LHDC share GAIA feature 0x10 and are
+    //    mutually exclusive. Switching codec briefly disconnects the headset;
+    //    the per-switch note keeps the user from being surprised. No group title.
     if (capabilities.lc3Supported) {
         item {
             Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -508,6 +525,19 @@ private fun LazyListScope.podControlItems(
                     checked = lc3Enabled,
                     onCheckedChange = onLc3Change,
                     enabled = controlEnabled(pending?.lc3)
+                )
+            }
+        }
+    }
+    if (capabilities.ldacSupported) {
+        item {
+            Card(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SwitchPreference(
+                    title = stringResource(R.string.control_ldac_title),
+                    summary = stringResource(R.string.control_ldac_reconnect_note),
+                    checked = ldacEnabled,
+                    onCheckedChange = onLdacChange,
+                    enabled = controlEnabled(pending?.ldac)
                 )
             }
         }

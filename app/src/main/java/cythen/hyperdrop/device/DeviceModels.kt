@@ -31,8 +31,11 @@ data class DeviceProfileSpec(
  * Central model registry ("机型档案" table): one declarative record per model,
  * alias-based matching, a verified/inferred flag, and a conservative probe fallback.
  *
- * Only PUDDING and MIRAGE are [DeviceProfile.verified] real-hardware; every other record
- * is protocol-inferred (best-effort GAIA constants, silent degrade on failure).
+ * Verified records are real-hardware models whose ANC/gain/LED/spatial mapping comes from
+ * FxxkMoondrop (MoonEar) real-device logs — the seven MoonEar-verified models (PUDDING,
+ * Golden Ages [1979] / [2], Space Travel 2 [Ultra], U.C.T.S, MOCA) plus MIRAGE (PUDDING's
+ * linked variant). Every other record is protocol-inferred (best-effort GAIA constants,
+ * silent degrade).
  */
 object DeviceModels {
 
@@ -120,10 +123,11 @@ object DeviceModels {
         lhdc: Boolean,
         dualConnection: Boolean,
         batteryForm: BatteryForm,
+        ldac: Boolean = false,
     ): CapabilityProfile {
         val sig = listOf(
             modes.joinToString(",") { it.mode.name }, spatial, headTracking, gain, led,
-            promptTone, lhdc, dualConnection, batteryForm.name,
+            promptTone, lhdc, ldac, dualConnection, batteryForm.name,
         ).joinToString("|")
         return capCache.getOrPut(sig) {
             CapabilityProfile(
@@ -140,6 +144,8 @@ object DeviceModels {
                 promptToneSupported = promptTone,
                 promptVolumeSupported = promptTone,
                 lhdcSupported = lhdc,
+                lc3Supported = false,
+                ldacSupported = ldac,
                 dualConnectionSupported = dualConnection,
                 batteryForm = batteryForm,
             )
@@ -208,6 +214,8 @@ object DeviceModels {
         lhdc: Boolean = false,
         dualConnection: Boolean = false,
         batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY,
+        ldac: Boolean = false,
+        verified: Boolean = false,
     ): DeviceProfileSpec {
         val (setMap, getMap) = ancMaps(pairs, getSequential = path == AncPathKind.AUDIO_CURATION)
         val control = genericControl(path, setMap, getMap, gain ?: gainIdentity)
@@ -221,12 +229,13 @@ object DeviceModels {
             lhdc = lhdc,
             dualConnection = dualConnection,
             batteryForm = batteryForm,
+            ldac = ldac,
         )
         return DeviceProfileSpec(
             id = id,
             displayName = displayName,
             aliases = aliases,
-            verified = false,
+            verified = verified,
             imageKey = imageKey,
             transports = listOf(PodTransport.RFCOMM_GAIA),
             capabilityProfile = caps,
@@ -252,14 +261,17 @@ object DeviceModels {
         inferred("bianca_stigmata", "BIANCA:STIGMATA", listOf("biancastigmata", "bianca", "stigmata"), "bianca_stigmata", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("h_i_d_e_404_klukai", "H.I.D.E.404_Klukai", listOf("404klukai", "klukai"), "h_i_d_e_404_klukai"),
         inferred("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), "laplace_oba"),
-        inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), "me_163_komet_moca"),
+        // MoonEar real-device verified (DC_PROFILES): equal gain [0,1,2] + LED, no spatial.
+        inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), "me_163_komet_moca", gain = gainIdentity, led = true, verified = true),
         inferred("alice", "MOONDROP Alice", listOf("alice"), "moondrop_alice"),
         inferred("moondrop_dots", "MOONDROP Dots", listOf("MOONDROP Dots"), "moondrop_dots"),
         inferred("edge", "MOONDROP EDGE", listOf("edge"), "moondrop_edge", pairs = ac3Pairs, gain = gainIdentity, batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("edge2", "MOONDROP EDGE 2", listOf("edge2", "edgeii"), "moondrop_edge_2", pairs = ac3Pairs, gain = gainIdentity, batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_evo_2", "Moondrop EVO 2", listOf("Moondrop EVO 2"), "moondrop_evo_2"),
-        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed),
-        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, promptTone = true),
+        // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (the
+        // ac4Pairs + AUDIO_CURATION default), reversed gain, spatial audio, no LED.
+        inferred("golden_ages", "MOONDROP Golden Ages", listOf("goldenages"), "moondrop_golden_ages", gain = gainReversed, spatial = true, verified = true),
+        inferred("golden_ages_2", "MOONDROP Golden Ages 2", listOf("goldenages2", "ga2", "goldenagesii"), "moondrop_golden_ages_2", gain = gainReversed, spatial = true, promptTone = true, verified = true),
         inferred("moondrop_littlewhite", "MOONDROP littlewhite", listOf("littlewhite"), "moondrop_littlewhite", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_mm3a", "MOONDROP MM3A", listOf("MOONDROP MM3A"), "moondrop_mm3a"),
         inferred("maca", "MOONDROP MACA", listOf("maca"), "moondrop_moca", lhdc = true, spatial = true),
@@ -274,7 +286,8 @@ object DeviceModels {
         inferred("moondrop_sparxie", "MOONDROP Sparxie", listOf("sparxie"), "moondrop_sparxie"),
         inferred("moondrop_susanoo_tws", "Moondrop SUSANOO TWS IOS", listOf("susanoo"), "moondrop_susanoo_tws"),
         inferred("moondrop_the_garden", "MOONDROP The Garden", listOf("garden"), "moondrop_the_garden"),
-        inferred("moondrop_u_c_t_s", "Moondrop U.C.T.S.", listOf("Moondrop U.C.T.S."), "moondrop_u_c_t_s"),
+        // MoonEar real-device verified: open-fit, hardware has NO ANC (use pairs with no modes).
+        inferred("moondrop_u_c_t_s", "Moondrop U.C.T.S.", listOf("Moondrop U.C.T.S."), "moondrop_u_c_t_s", pairs = emptyList(), verified = true),
         inferred("moondrop_ultrasonic", "MOONDROP Ultrasonic", listOf("ultrasonic"), "moondrop_ultrasonic"),
         inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"), "moondrop_voyager", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_x_yasuno_kiyono", "MOONDROP x YASUNO KIYONO", listOf("yasunokiyono", "yasuno", "kiyono"), "moondrop_x_yasuno_kiyono"),
@@ -288,8 +301,11 @@ object DeviceModels {
         inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), "punishing_gray_raven"),
         inferred("robins", "Robin's Earphones", listOf("robins", "robin", "robin's earphones"), "robin_s_earphones"),
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
-        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2", gain = gainReversed, spatial = true),
-        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed, spatial = true),
+        // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (default),
+        // reversed gain, no spatial/LED. Space Travel 2 Ultra protocol unpublished → conservative
+        // capabilities but still verified (real hardware confirmed working via GAIA).
+        inferred("space_travel_2", "MOONDROP Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2", gain = gainReversed, verified = true),
+        inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed, verified = true),
         inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), "susanoo_tws"),
         inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), "zzz_angels_ows"),
     )

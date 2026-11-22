@@ -134,6 +134,9 @@
     <string name="control_lc3_title">LC3 codec</string>
     <string name="control_lc3_summary">Enable the low-complexity LC3 codec</string>
     <string name="control_lc3_reconnect_note">Switching LC3 briefly disconnects and reconnects the headset</string>
+    <string name="control_ldac_title">LDAC codec</string>
+    <string name="control_ldac_summary">Enable the high-resolution LDAC codec</string>
+    <string name="control_ldac_reconnect_note">Switching LDAC briefly disconnects and reconnects the headset</string>
     <string name="control_lhdc_title">LHDC codec</string>
     <string name="control_lhdc_summary">Enable the high-resolution LHDC codec</string>
     <string name="control_lhdc_reconnect_note">Switching LHDC briefly disconnects and reconnects the headset</string>
@@ -145,6 +148,8 @@
     <string name="conflict_lhdc_dual_message_dual">Turning on dual-device connection will turn off LHDC.</string>
     <string name="conflict_lc3_lhdc_title">LC3 and LHDC cannot be on together</string>
     <string name="conflict_lc3_lhdc_message_lc3">Turning on LC3 will turn off LHDC.</string>
+    <string name="conflict_ldac_title">Only one codec can be active at a time</string>
+    <string name="conflict_ldac_message">Turning on LDAC will turn off the active codec.</string>
     <string name="conflict_switch">Switch</string>
 
     <string name="debug_title">Debug options</string>

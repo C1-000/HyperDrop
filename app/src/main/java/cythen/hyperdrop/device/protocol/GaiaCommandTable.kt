@@ -53,6 +53,7 @@ interface GaiaCommandTable {
     val queryVoiceConfig: ByteArray? get() = null
     val queryLhdc: ByteArray? get() = null
     val queryLc3: ByteArray? get() = null
+    val queryLdac: ByteArray? get() = null
     val queryDualConnection: ByteArray? get() = null
 
     fun setSpatialAudio(enabled: Boolean): ByteArray? = null
@@ -61,6 +62,7 @@ interface GaiaCommandTable {
     fun setPromptTone(enabled: Boolean, volume: Int = 50, index: Int = 0): ByteArray? = null
     fun setLhdc(enabled: Boolean): ByteArray? = null
     fun setLc3(enabled: Boolean): ByteArray? = null
+    fun setLdac(enabled: Boolean): ByteArray? = null
     fun setDualConnection(enabled: Boolean): ByteArray? = null
 
     // ---- Receive path ------------------------------------------------------------

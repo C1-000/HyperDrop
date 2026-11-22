@@ -69,6 +69,7 @@ private val YIELD_BLOCKED_ACTIONS = setOf(
     OppoPodsAction.ACTION_HEAD_TRACKING_SET,
     OppoPodsAction.ACTION_LHDC_SET,
     OppoPodsAction.ACTION_LC3_SET,
+    OppoPodsAction.ACTION_LDAC_SET,
     OppoPodsAction.ACTION_DUAL_CONNECTION_SET,
 )
 
@@ -107,12 +108,14 @@ class DeviceSession {
     private var currentVoiceIndex: Int = 0
     private var currentLhdcEnabled: Boolean = false
     private var currentLc3Enabled: Boolean = false
+    private var currentLdacEnabled: Boolean = false
     private var currentDualConnectionEnabled: Boolean = false
     private var currentHeadTrackingEnabled: Boolean = false
     /** Timestamp until which a contradictory device report for LHDC is treated as a
      *  transient reconnect artifact and ignored (see [setLhdc]). */
     private var lhdcWriteGraceUntilMs = 0L
     private var lc3WriteGraceUntilMs = 0L
+    private var ldacWriteGraceUntilMs = 0L
     private var dualWriteGraceUntilMs = 0L
     /** Number of follow-up feature pages already requested in the current discovery. */
     private val featurePageCount = AtomicInteger(0)
@@ -261,6 +264,12 @@ class DeviceSession {
         }
     }
 
+    private fun changeUILdac(enabled: Boolean) {
+        sendAppStatusBroadcast(OppoPodsAction.ACTION_LDAC_CHANGED) {
+            putExtra("enabled", enabled)
+        }
+    }
+
     private fun changeUIDualConnection(enabled: Boolean) {
         sendAppStatusBroadcast(OppoPodsAction.ACTION_DUAL_CONNECTION_CHANGED) {
             putExtra("enabled", enabled)
@@ -302,6 +311,7 @@ class DeviceSession {
                 changeUIHeadTracking(currentHeadTrackingEnabled)
                 changeUILhdc(currentLhdcEnabled)
                 changeUILc3(currentLc3Enabled)
+                changeUILdac(currentLdacEnabled)
                 changeUIDualConnection(currentDualConnectionEnabled)
                 if (::mDevice.isInitialized && isConnected) {
                     // Our own UI still needs to know which device is connected, otherwise the
@@ -375,6 +385,9 @@ class DeviceSession {
             }
             OppoPodsAction.ACTION_LC3_SET -> {
                 setLc3(intent.getBooleanExtra("enabled", false))
+            }
+            OppoPodsAction.ACTION_LDAC_SET -> {
+                setLdac(intent.getBooleanExtra("enabled", false))
             }
             OppoPodsAction.ACTION_DUAL_CONNECTION_SET -> {
                 setDualConnection(intent.getBooleanExtra("enabled", false))
@@ -648,6 +661,7 @@ class DeviceSession {
                 this.addAction(OppoPodsAction.ACTION_HEAD_TRACKING_SET)
                 this.addAction(OppoPodsAction.ACTION_LHDC_SET)
                 this.addAction(OppoPodsAction.ACTION_LC3_SET)
+                this.addAction(OppoPodsAction.ACTION_LDAC_SET)
                 this.addAction(OppoPodsAction.ACTION_DUAL_CONNECTION_SET)
                 this.addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                 this.addAction(OppoPodsAction.ACTION_CONFIG_CHANGED)
@@ -1053,6 +1067,20 @@ class DeviceSession {
                     Log.i(TAG, "LC3: ${report.enabled}")
                 }
             }
+            is GaiaReport.Ldac -> {
+                // LDAC is also a codec switch on the same feature; ignore transient OFF.
+                if (report.enabled != currentLdacEnabled &&
+                    !report.enabled &&
+                    SystemClock.elapsedRealtime() < ldacWriteGraceUntilMs
+                ) {
+                    Log.i(TAG, "LDAC: ignoring transient OFF during reconnect grace")
+                } else {
+                    currentLdacEnabled = report.enabled
+                    ldacWriteGraceUntilMs = 0L
+                    changeUILdac(report.enabled)
+                    Log.i(TAG, "LDAC: ${report.enabled}")
+                }
+            }
             is GaiaReport.DualConnection -> {
                 if (report.enabled != currentDualConnectionEnabled &&
                     !report.enabled &&
@@ -1269,6 +1297,21 @@ class DeviceSession {
         }
     }
 
+    /** LDAC codec toggle (feature 0x10), same optimistic + readback strategy. */
+    fun setLdac(enabled: Boolean) {
+        val packet = commandTable().setLdac(enabled) ?: return
+        currentLdacEnabled = enabled
+        ldacWriteGraceUntilMs = SystemClock.elapsedRealtime() + WRITE_CONFIRM_GRACE_MS
+        changeUILdac(enabled)
+        CoroutineScope(Dispatchers.IO).launch {
+            sendPacketSafe(GaiaTransport.v4(packet), "LDAC")
+            commandTable().queryLdac?.let { q ->
+                delay(140)
+                sendPacketSafe(GaiaTransport.v4(q), "LDAC query")
+            }
+        }
+    }
+
     /** Dual-connection toggle (feature 0x14), same optimistic + grace strategy. */
     fun setDualConnection(enabled: Boolean) {
         val packet = commandTable().setDualConnection(enabled) ?: return
@@ -1397,6 +1440,8 @@ class DeviceSession {
         commandTable().queryLhdc?.let { sendPacketSafe(GaiaTransport.v4(it), "LHDC query") }
         delay(100)
         commandTable().queryLc3?.let { sendPacketSafe(GaiaTransport.v4(it), "LC3 query") }
+        delay(100)
+        commandTable().queryLdac?.let { sendPacketSafe(GaiaTransport.v4(it), "LDAC query") }
         delay(100)
         commandTable().queryDualConnection?.let { sendPacketSafe(GaiaTransport.v4(it), "dual connection query") }
         delay(100)

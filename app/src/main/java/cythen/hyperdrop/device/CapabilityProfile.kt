@@ -46,6 +46,7 @@ data class CapabilityProfile(
     val promptVolumeSupported: Boolean = false,
     val lhdcSupported: Boolean = false,
     val lc3Supported: Boolean = false,
+    val ldacSupported: Boolean = false,
     val dualConnectionSupported: Boolean = false,
     val batteryForm: BatteryForm = BatteryForm.TWS_THREE_WAY,
 ) {
@@ -64,6 +65,7 @@ data class CapabilityProfile(
         promptVolumeSupported = promptVolumeSupported,
         lhdcSupported = lhdcSupported,
         lc3Supported = lc3Supported,
+        ldacSupported = ldacSupported,
         dualConnectionSupported = dualConnectionSupported,
         batteryForm = batteryForm,
     )
@@ -119,9 +121,9 @@ data class CapabilityProfile(
             },
             ObservationRule(F_DAC_GAIN) { it.copy(gainSupported = true) },
             // GAIA feature 16 only signals "codec control present"; the bitmask cannot
-            // distinguish LC3 from LHDC, so observation opens both conservatively.
+            // distinguish LC3 / LDAC / LHDC, so observation opens all three conservatively.
             ObservationRule(F_CODEC_TYPE) {
-                it.copy(lhdcSupported = true, lc3Supported = true)
+                it.copy(lhdcSupported = true, lc3Supported = true, ldacSupported = true)
             },
             ObservationRule(F_LED) { it.copy(ledSupported = true) },
             ObservationRule(F_ONEBRINGTWO) { it.copy(dualConnectionSupported = true) },

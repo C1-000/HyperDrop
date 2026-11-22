@@ -70,4 +70,23 @@ class MutualExclusionTest {
         val statesLhdcOff = states + (MutualExclusionTarget.LHDC to (true to false))
         assertFalse(mutualExclusionDeferred(statesLhdcOff, MutualExclusionTarget.LC3, wanted = true))
     }
+
+    @Test
+    fun `all codecs defer one another but LDAC does not conflict with dual connection`() {
+        val states = mapOf(
+            MutualExclusionTarget.LHDC to (true to false),
+            MutualExclusionTarget.LC3 to (true to false),
+            MutualExclusionTarget.LDAC to (true to false),
+            MutualExclusionTarget.DUAL_CONNECTION to (true to true),
+        )
+        // Enabling each codec while another codec (LC3) is on defers.
+        val lc3On = states + (MutualExclusionTarget.LC3 to (true to true))
+        assertTrue(mutualExclusionDeferred(lc3On, MutualExclusionTarget.LDAC, wanted = true))
+        assertTrue(mutualExclusionDeferred(lc3On, MutualExclusionTarget.LHDC, wanted = true))
+        // LDAC does not conflict with dual-device connection.
+        val ldacOn = states + (MutualExclusionTarget.LDAC to (true to true))
+        assertFalse(mutualExclusionDeferred(ldacOn, MutualExclusionTarget.DUAL_CONNECTION, wanted = true))
+        // No codec on: enabling LDAC is immediate.
+        assertFalse(mutualExclusionDeferred(states, MutualExclusionTarget.LDAC, wanted = true))
+    }
 }

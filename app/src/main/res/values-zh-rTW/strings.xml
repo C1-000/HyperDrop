@@ -134,6 +134,9 @@
     <string name="control_lc3_title">LC3 編碼</string>
     <string name="control_lc3_summary">開啟低複雜度 LC3 編碼</string>
     <string name="control_lc3_reconnect_note">切換 LC3 時耳機會短暫斷開並自動重新連線</string>
+    <string name="control_ldac_title">LDAC 編碼</string>
+    <string name="control_ldac_summary">開啟高解析度 LDAC 編碼</string>
+    <string name="control_ldac_reconnect_note">切換 LDAC 時耳機會短暫斷開並自動重新連線</string>
     <string name="control_lhdc_title">LHDC 編碼</string>
     <string name="control_lhdc_summary">開啟高解析度 LHDC 編碼</string>
     <string name="control_lhdc_reconnect_note">切換 LHDC 時耳機會短暫斷開並自動重新連線</string>
@@ -145,6 +148,8 @@
     <string name="conflict_lhdc_dual_message_dual">開啟雙裝置連線會關閉 LHDC。</string>
     <string name="conflict_lc3_lhdc_title">LC3 與 LHDC 不能同時開啟</string>
     <string name="conflict_lc3_lhdc_message_lc3">開啟 LC3 會關閉 LHDC。</string>
+    <string name="conflict_ldac_title">同時間只能開啟一種編碼</string>
+    <string name="conflict_ldac_message">開啟 LDAC 會關閉目前已開啟的編碼。</string>
     <string name="conflict_switch">切換</string>
 
     <string name="debug_title">偵錯選項</string>

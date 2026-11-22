@@ -128,7 +128,7 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 
 **其它已归档但为"理论支持"的机型**：ALICE (QCC5151)、SPARKS (QCC3040)、VOYAGER (QCC5144)、NEKOCAKE (BT8922E)、PILL (BT8932F)、ULTRASONIC (BT8952F)、Robin (BT8952F)、太空漫游一代、方糖 BLOCK、羽翼 EDGE·EDGE2。
 
-> HyperDrop 目前仅 PUDDING 与 MIRAGE 标 `verified=true`（MIRAGE 为布丁联动版，复用同一档案），其余 43 款为协议推断。上表 7 款可作为后续把"推断"升级为"实机验证"的候选清单，但升级必须有真机日志支撑。
+> HyperDrop 现已把上表 7 款 MoonEar 实机验证机型的能力与控制映射加入档案并标 `verified=true`（其中 PUDDING 与 MIRAGE 共享同一档案；MIRAGE 为布丁联动版），共 8 款 verified。其余 37 款仍为协议推断。建议后续用真机日志逐款核对增益/LED/ANC 细节。
 
 ## 8. Codec（编码）控制方案
 
