@@ -64,6 +64,7 @@ private fun DeviceAdaptationCard(profile: DeviceProfile) {
     Card(modifier = Modifier.padding(vertical = 4.dp)) {
         BasicComponent(
             title = profile.displayName,
+            summary = profile.note.takeIf { it.isNotBlank() },
             onClick = {},
         )
     }

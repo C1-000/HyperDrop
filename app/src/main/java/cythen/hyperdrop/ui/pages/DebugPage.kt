@@ -64,27 +64,26 @@ fun DebugPage(
                     title = stringResource(R.string.debug_simulate_device),
                     summary = stringResource(R.string.debug_simulate_device_summary),
                 )
-                DeviceModels.models.forEach { profile ->
-                    val badge = if (profile.verified) {
-                        stringResource(R.string.verified_badge)
-                    } else {
-                        stringResource(R.string.inferred_badge)
-                    }
-                    BasicComponent(
-                        title = profile.displayName,
-                        summary = buildString {
-                            append(profile.id)
-                            append(" · ")
-                            append(badge)
-                            if (profile.note.isNotBlank()) {
-                                append(" · ")
-                                append(profile.note)
-                            }
-                        },
-                        onClick = { onAddProfile(profile) },
-                    )
-                }
             }
+        }
+
+        // Both the debug simulator and the adaptation page read the same DeviceProfile catalog;
+        // grouping follows the archive's verified flag and the note comes straight from its note field.
+        val verifiedProfiles = DeviceModels.models.filter { it.verified }
+        val inferredProfiles = DeviceModels.models.filter { !it.verified }
+
+        item {
+            GroupHeader(title = stringResource(R.string.adaptation_verified))
+        }
+        items(verifiedProfiles, key = { "verify-${it.id}" }) { profile ->
+            ProfileCard(profile = profile, onAdd = onAddProfile)
+        }
+
+        item {
+            GroupHeader(title = stringResource(R.string.adaptation_inferred))
+        }
+        items(inferredProfiles, key = { "infer-${it.id}" }) { profile ->
+            ProfileCard(profile = profile, onAdd = onAddProfile)
         }
 
         item {
@@ -151,6 +150,31 @@ private fun SectionHeader(title: String, summary: String) {
             modifier = Modifier.padding(top = 2.dp),
             fontSize = 13.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        )
+    }
+}
+
+@Composable
+private fun GroupHeader(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+    )
+}
+
+@Composable
+private fun ProfileCard(
+    profile: DeviceProfile,
+    onAdd: (DeviceProfile) -> Unit,
+) {
+    Card(modifier = Modifier.padding(vertical = 4.dp)) {
+        BasicComponent(
+            title = profile.displayName,
+            summary = profile.note.takeIf { it.isNotBlank() },
+            onClick = { onAdd(profile) },
         )
     }
 }
