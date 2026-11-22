@@ -46,6 +46,8 @@ interface GaiaCommandTable {
     val ancPath: AncPathKind get() = AncPathKind.ANC_V2
 
     val querySupportedFeatures: ByteArray? get() = null
+    /** Second/subsequent page of feature discovery (GET_SUPPORTED_FEATURES_NEXT). */
+    val querySupportedFeaturesNext: ByteArray? get() = null
     val querySpatialAudio: ByteArray? get() = null
     val queryHeadTracking: ByteArray? get() = null
     val queryVoiceConfig: ByteArray? get() = null

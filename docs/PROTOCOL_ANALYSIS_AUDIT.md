@@ -31,6 +31,25 @@
 
 ---
 
+## 1.5 修复状态（v1.1.2beta2 更新）
+
+审计发现的确定性缺陷已在本版本处理，逐条状态如下（"已修"均以本仓库对应提交为准）：
+
+| 编号 | 问题 | 状态 | 落地位置 |
+|---|---|---|---|
+| D1 / A1 | `GET_SUPPORTED_FEATURES` 位图解析错误 | **已修** | `GenericGaiaCommandTable.kt` 改为 `(featureId, version)` 二元组解析（payload[4]=hasMore、从 payload[5] 起每 2 字节取 featureId）；`GaiaReport.SupportedFeatures` 增加 `hasMore`；新增 `querySupportedFeaturesNext`（`00 1D 00 02`）与 `DeviceSession` 的分页累加（上限 8 页） |
+| ② / B9 | `F_SPATIAL_AUDIO` 值误用 24 | **已修** | `CapabilityProfile.kt` 由 24 改为官方 wire 值 18（0x12）；24 实为 POWER_CONTROL，旧值导致空间音频观测规则永不触发 |
+| D2 / A7 | ANC_V1 请求语义错 + 响应永不命中 | **已修** | `GenericGaiaCommandTable.kt` 的 ANC_V1 查询改 `GET_CURRENT_ANC_MODE=0x04`、设置改 `SET_ANC_MODE=0x05`，响应 sub 判定改 `0x04/0x05`（仍为潜伏路径：全仓无机型使用 ANC_V1） |
+| D3 / A6 | 电量解析丢弃带高位样本 | **已修** | `GenericGaiaCommandTable.kt`、`PuddingCommandTable.kt` 的电量字节加 `and 0x7F` 容错；GAIA 无充电位，未伪造 charging 状态 |
+| D5 | `Packets.kt` 充电位约定与 GAIA 混用 | **已修** | `Packets.kt` 的 `BatteryParser` KDoc 明确标注 0x80 充电位仅 OPPO AA 私有协议使用，GAIA 路径不得套用 |
+| D4 | `transports` 无人读取、BLE 未实现 | **未修（本轮明确暂缓）** | 仍是纯声明，连接路径硬编码 SPP；BLE GAIA / BLE_SRC_9ECA 传输层是适配更多机型的真正前置，工作量最大，另行安排 |
+| A2 / A4 / A5 / B7 / B8 | 帧语义与协商结论 | 无需改码 | 均为分析结论：AudioCuration 单字节写法本就正确；`001D410300` 为入站 RESPONSE；API 3.1 与 vendor 路由正交；ordinal/value 需区分。仅作文档知识保留 |
+| C1–C4 | 机型实际路径、mode 转换、9ECA 并存、EDGE 控制栈 | **未修（需实测）** | 本仓库无 HCI 抓包文件，实机日志中也无 `GET_SUPPORTED_FEATURES` 帧；只能抓包实测，文档不再给结论性描述 |
+
+> 注意：D1 修复后 `GET_SUPPORTED_FEATURES` 才真正成为"运行时观测补全"的可信数据源；但在唯一受控机型 PUDDING 上从未触发该查询，故补全链路的端到端效果仍待实机验证。
+
+---
+
 ## 2. 会话关键结论逐条判定
 
 | # | 结论（会话中曾出现） | 判定 | 依据 |
@@ -341,8 +360,11 @@
 
 ## 9. 修订建议清单（按执行顺序）
 
-1. 修 `GenericGaiaCommandTable.kt:179-191` 二元组解析（D1）—— 唯一会污染运行时数据的确定性 bug。
-2. 处理 ANC_V1 分支（D2）—— 删或改，别留着"看起来支持"。
-3. 电量解析加 `and 0x7F` 容错（D3），并把 `Packets.kt` 的充电位注释限定为 AA 专用（D5）。
-4. 让 `transports` 真正参与连接分派（D4）—— 它现在只是声明，无人读取；连接路径硬编码 SPP。这一步是"适配更多设备"的真正前置条件。
-5. 需要实测才能推进的部分（C1-C4）单独列一个"待抓包"清单，不再在文档里给结论性描述。
+1. ~~修 `GenericGaiaCommandTable.kt:179-191` 二元组解析（D1）—— 唯一会污染运行时数据的确定性 bug。~~ **已修（v1.1.2beta2）**。
+2. ~~处理 ANC_V1 分支（D2）—— 删或改，别留着"看起来支持"。~~ **已修（v1.1.2beta2）**：改为 `GET/SET_CURRENT_MODE=0x04/0x05` + sub `0x04/0x05`。
+3. ~~电量解析加 `and 0x7F` 容错（D3），并把 `Packets.kt` 的充电位注释限定为 AA 专用（D5）。~~ **已修（v1.1.2beta2）**。
+4. 让 `transports` 真正参与连接分派（D4）—— 它现在只是声明，无人读取；连接路径硬编码 SPP。这一步是"适配更多设备"的真正前置条件。**未修，本轮明确暂缓**。
+5. 需要实测才能推进的部分（C1-C4）单独列一个"待抓包"清单，不再在文档里给结论性描述。**未修，需抓包实测**。
+6. 附加（审计时未在清单内）：`F_SPATIAL_AUDIO` 值 24→18（B9/②）。**已修（v1.1.2beta2）**。
+
+最新状态汇总见 "1.5 修复状态" 表。

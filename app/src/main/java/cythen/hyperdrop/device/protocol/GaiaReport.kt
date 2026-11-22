@@ -32,8 +32,15 @@ sealed interface GaiaReport {
     /** Dual-connection toggle report (feature 0x14). */
     data class DualConnection(val enabled: Boolean) : GaiaReport
 
-    /** Bitmask of supported GAIA feature ids. */
-    data class SupportedFeatures(val features: Set<Int>) : GaiaReport
+    /**
+     * Feature ids reported by GET_SUPPORTED_FEATURES, decoded from (featureId, version)
+     * byte pairs — NOT from a bitmask. [hasMore] mirrors the device's "more pages" flag;
+     * when true the session issues GET_SUPPORTED_FEATURES_NEXT to accumulate the rest.
+     */
+    data class SupportedFeatures(
+        val features: Set<Int>,
+        val hasMore: Boolean = false,
+    ) : GaiaReport
 
     /** GAIA v1 API-version response; negotiation only, no state to publish. */
     object GaiaNegotiation : GaiaReport

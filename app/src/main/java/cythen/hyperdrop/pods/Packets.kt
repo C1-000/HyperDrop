@@ -313,6 +313,10 @@ object Enums {
  * Payload consists of pairs: [Index(1B), RawValue(1B)]
  *   Index: 1=Left, 2=Right, 3=Case
  *   RawValue: battery = value & 0x7F, charging = (value & 0x80) != 0
+ *
+ * NOTE: the 0x80 charging bit is an OPPO AA-private-protocol convention only.
+ * Qualcomm GAIA battery payloads carry a plain 0..100 level with no charging bit,
+ * so this mask must NOT be applied to GAIA frames (see the GAIA command tables).
  */
 object BatteryParser {
 

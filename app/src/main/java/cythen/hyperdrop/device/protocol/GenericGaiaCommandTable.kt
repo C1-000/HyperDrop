@@ -24,7 +24,8 @@ class GenericGaiaCommandTable(
     override val queryNoiseMode: ByteArray = when (ancPathKind) {
         AncPathKind.ANC_V2 -> byteArrayOf(0x00, 0x1D, 0x40, 0x03)
         AncPathKind.AUDIO_CURATION -> byteArrayOf(0x00, 0x1D, 0x10, 0x03)
-        AncPathKind.ANC_V1 -> byteArrayOf(0x00, 0x1D, 0x04, 0x01)
+        // ANC_V1 GET_CURRENT_ANC_MODE is command 0x04 (not GET_ANC_STATE 0x01).
+        AncPathKind.ANC_V1 -> byteArrayOf(0x00, 0x1D, 0x04, 0x04)
     }
 
     override val queryGainLevel: ByteArray = byteArrayOf(0x00, 0x1D, 0x1E, 0x01)
@@ -37,6 +38,7 @@ class GenericGaiaCommandTable(
     // ---- Extended feature queries ------------------------------------------------
 
     override val querySupportedFeatures: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x01)
+    override val querySupportedFeaturesNext: ByteArray = byteArrayOf(0x00, 0x1D, 0x00, 0x02)
     override val querySpatialAudio: ByteArray = byteArrayOf(0x00, 0x1D, 0x24, 0x01)
     override val queryHeadTracking: ByteArray = byteArrayOf(0x00, 0x1D, 0x24, 0x03)
     override val queryVoiceConfig: ByteArray = byteArrayOf(0x00, 0x1D, 0x1C, 0x01)
@@ -50,7 +52,8 @@ class GenericGaiaCommandTable(
         return when (ancPath) {
             AncPathKind.ANC_V2 -> byteArrayOf(0x00, 0x1D, 0x40, 0x04, wire.toByte())
             AncPathKind.AUDIO_CURATION -> byteArrayOf(0x00, 0x1D, 0x10, 0x04, wire.toByte())
-            AncPathKind.ANC_V1 -> byteArrayOf(0x00, 0x1D, 0x04, 0x02, wire.toByte())
+            // ANC_V1 SET_ANC_MODE is command 0x05 (not SET_ANC_STATE 0x02).
+            AncPathKind.ANC_V1 -> byteArrayOf(0x00, 0x1D, 0x04, 0x05, wire.toByte())
         }
     }
 
@@ -104,12 +107,16 @@ class GenericGaiaCommandTable(
         val sub = payload[3].toInt() and 0xFF
 
         // ANC responses (SET echo / GET) carry one value byte at index 4.
-        val ancResponseCmd = when (ancPath) {
-            AncPathKind.ANC_V2 -> 0x41
-            AncPathKind.AUDIO_CURATION -> 0x11
-            AncPathKind.ANC_V1 -> 0x05
+        // ANC_V1 GET_CURRENT_ANC_MODE=0x04 / SET_ANC_MODE=0x05, so its RESPONSE
+        // (cmd 0x05) uses subs 0x04/0x05 — never 0x03/0x04 like V2/AudioCuration.
+        val ancResponseCmd: Int
+        val ancSubs: IntArray
+        when (ancPath) {
+            AncPathKind.ANC_V2 -> { ancResponseCmd = 0x41; ancSubs = intArrayOf(0x03, 0x04) }
+            AncPathKind.AUDIO_CURATION -> { ancResponseCmd = 0x11; ancSubs = intArrayOf(0x03, 0x04) }
+            AncPathKind.ANC_V1 -> { ancResponseCmd = 0x05; ancSubs = intArrayOf(0x04, 0x05) }
         }
-        if (cmd == ancResponseCmd && (sub == 0x03 || sub == 0x04) && payload.size >= 5) {
+        if (cmd == ancResponseCmd && ancSubs.contains(sub) && payload.size >= 5) {
             val reported = payload[4].toInt() and 0xFF
             val ui = ancGetMap.getOrNull(reported)?.takeIf { it >= 0 }
                 ?: ancSetMap.indexOf(reported).takeIf { it >= 0 }
@@ -124,7 +131,10 @@ class GenericGaiaCommandTable(
             var i = 4
             while (i + 1 < payload.size) {
                 val id = payload[i].toInt() and 0xFF
-                val level = payload[i + 1].toInt() and 0xFF
+                val raw = payload[i + 1].toInt() and 0xFF
+                // Some firmware packs a charging flag in bit 7; mask it so a charged
+                // level is not discarded just because the high bit is set.
+                val level = raw and 0x7F
                 if (level in 0..100) when (id) {
                     1 -> left = level
                     2 -> right = level
@@ -176,19 +186,18 @@ class GenericGaiaCommandTable(
             if (v == 0 || v == 1) return GaiaReport.DualConnection(v == 1)
         }
 
-        // Supported features: 00 1D 01 01 <bitmask words>
+        // Supported features: 00 1D 01 01 [hasMore][featureId, version]...
+        // Official app parses this as (featureId, version) byte pairs, NOT a bitmask.
+        // payload[4] is the has-more flag; pairs start at payload[5], featureId first.
         if (cmd == 0x01 && (sub == 0x01 || sub == 0x02)) {
+            val hasMore = payload.getOrNull(4)?.toInt()?.and(0xFF) == 1
             val features = mutableSetOf<Int>()
-            var i = 4
-            while (i + 3 < payload.size) {
-                val word = ((payload[i].toInt() and 0xFF) shl 24) or
-                    ((payload[i + 1].toInt() and 0xFF) shl 16) or
-                    ((payload[i + 2].toInt() and 0xFF) shl 8) or
-                    (payload[i + 3].toInt() and 0xFF)
-                for (bit in 0..31) if (word and (1 shl bit) != 0) features += bit
-                i += 4
+            var i = 5
+            while (i + 1 < payload.size) {
+                features += payload[i].toInt() and 0xFF
+                i += 2 // skip the 1-byte version that follows each featureId
             }
-            return GaiaReport.SupportedFeatures(features)
+            return GaiaReport.SupportedFeatures(features, hasMore)
         }
 
         if (payload.size >= 4 && payload[1] == 0x0A.toByte()) return GaiaReport.GaiaNegotiation

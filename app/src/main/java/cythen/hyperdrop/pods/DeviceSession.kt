@@ -49,6 +49,8 @@ private const val APP_UI_ACTIVE_TIMEOUT_MS = 600_000L
 // While an optimistic LHDC/dual write awaits confirmation, contradictory reports are
 // ignored for this long (mirrors miuixmoondrop's "keep optimistic value on timeout").
 private const val WRITE_CONFIRM_GRACE_MS = 5_000L
+// Guard against a malformed device that always reports "more pages" forever.
+private const val MAX_FEATURE_PAGES = 8
 private const val DEFAULT_GAIN_LEVEL = 1 // medium (UI low/medium/high = 0/1/2)
 
 /** UI/system write actions that must not reach the earbuds while control is yielded. */
@@ -109,6 +111,8 @@ class DeviceSession {
      *  transient reconnect artifact and ignored (see [setLhdc]). */
     private var lhdcWriteGraceUntilMs = 0L
     private var dualWriteGraceUntilMs = 0L
+    /** Number of follow-up feature pages already requested in the current discovery. */
+    private val featurePageCount = AtomicInteger(0)
     private var lastKnownLeftBattery: Int = 0
     private var lastKnownRightBattery: Int = 0
     private var lastKnownCaseBattery: Int = 0
@@ -1034,8 +1038,19 @@ class DeviceSession {
                 }
             }
             is GaiaReport.SupportedFeatures -> {
-                Log.i(TAG, "supported features: ${report.features}")
+                Log.i(TAG, "supported features: ${report.features} hasMore=${report.hasMore}")
                 DeviceRegistry.recordObservedFeatures(deviceName(), report.features)
+                // Walk follow-up pages until the device says it has no more, with a hard
+                // cap so a malformed "always more" device cannot loop forever.
+                if (report.hasMore && featurePageCount.get() < MAX_FEATURE_PAGES) {
+                    commandTable().querySupportedFeaturesNext?.let { next ->
+                        val page = featurePageCount.incrementAndGet()
+                        CoroutineScope(Dispatchers.IO).launch {
+                            delay(100)
+                            sendPacketSafe(GaiaTransport.v4(next), "supported features page $page")
+                        }
+                    }
+                }
             }
             GaiaReport.GaiaNegotiation -> {
                 Log.d(TAG, "GAIA negotiation response: ${payload.toHexString(HexFormat.UpperCase)}")
@@ -1225,9 +1240,10 @@ class DeviceSession {
         }
     }
 
-    /** Ask the earbud for its supported-feature bitmask (feature 0x00). */
+    /** Ask the earbud for its supported-feature list (feature 0x00). */
     fun querySupportedFeatures() {
         val query = commandTable().querySupportedFeatures ?: return
+        featurePageCount.set(0)
         CoroutineScope(Dispatchers.IO).launch {
             sendPacketSafe(GaiaTransport.v4(query), "supported features query")
         }
@@ -1317,6 +1333,7 @@ class DeviceSession {
         sendPacketSafe(GaiaTransport.v4(commandTable().queryNoiseMode), reason)
         delay(100)
         // Feature discovery first so observation can open capabilities before the UI reads them.
+        featurePageCount.set(0)
         commandTable().querySupportedFeatures?.let {
             sendPacketSafe(GaiaTransport.v4(it), "supported features query")
         }

@@ -207,4 +207,67 @@ class DeviceCapabilitiesTest {
         assertFalse(DeviceRegistry.shouldProbeOnConnect("Sony XM5"))
         assertTrue(DeviceRegistry.profileFor("MOONDROP something unknown").note.contains("Unrecognised"))
     }
+
+    // ---- Protocol audit fixes (v1.1.2beta2) -------------------------------------
+
+    @Test
+    fun `supported features decode as featureId-version pairs not a bitmask`() {
+        val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
+        // hasMore=1 at payload[4]; pairs: (F_BASIC=0,v1), (LED=19,v2), (ANC_V2=32,v1).
+        // A bitmask decoder would have produced garbage bit indices instead of these ids.
+        val report = table.parse(
+            byteArrayOf(0, 0x1D, 0x01, 0x01, 0x01, 0x00, 0x01, 19, 0x02, 32, 0x01)
+        )
+        assertTrue(report is cythen.hyperdrop.device.protocol.GaiaReport.SupportedFeatures)
+        val f = report as cythen.hyperdrop.device.protocol.GaiaReport.SupportedFeatures
+        assertTrue(f.hasMore)
+        assertEquals(setOf(0, 19, 32), f.features)
+        assertNotNullPagedNext(table)
+    }
+
+    private fun assertNotNullPagedNext(table: cythen.hyperdrop.device.protocol.GaiaCommandTable) {
+        assertEquals(
+            "00 1D 00 02",
+            table.querySupportedFeaturesNext!!.joinToString(" ") { "%02X".format(it) },
+        )
+    }
+
+    @Test
+    fun `spatial audio feature id is 18 not 24`() {
+        assertEquals(18, CapabilityProfile.F_SPATIAL_AUDIO)
+        // Observation driven by a reported feature id 18 must open spatial capability.
+        val observed = DeviceRegistry.resolveCapabilities(
+            DeviceCapabilities.NONE,
+            setOf(CapabilityProfile.F_SPATIAL_AUDIO),
+        )
+        assertTrue(observed.spatialAudioSupported)
+        assertTrue(observed.spatialSoundSwitchSupported)
+    }
+
+    @Test
+    fun `ANC_V1 uses GET mode 0x04 SET mode 0x05 and matching response subs`() {
+        val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable(
+            ancPathKind = cythen.hyperdrop.device.protocol.AncPathKind.ANC_V1,
+            ancSetMap = intArrayOf(-1, 0, 1, 2, 3),
+            ancGetMap = intArrayOf(1, 2, 3, 4),
+        )
+        assertEquals("00 1D 04 04", table.queryNoiseMode.joinToString(" ") { "%02X".format(it) })
+        // ui 2 -> ancSetMap[2] = 1 wire
+        assertEquals(
+            "00 1D 04 05 01",
+            table.setNoiseMode(2)!!.joinToString(" ") { "%02X".format(it) },
+        )
+        // Response cmd 0x05 with sub 0x04/0x05 is accepted; old 0x03 was never hit.
+        val r = table.parse(byteArrayOf(0, 0x1D, 0x05, 0x04, 0x01))
+        assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.AncMode)
+    }
+
+    @Test
+    fun `battery level masks the high charging bit`() {
+        val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
+        // Left=0x80|85 => level 85 with a stray charging bit must still be reported.
+        val r = table.parse(byteArrayOf(0, 0x1D, 0x1B, 0x01, 0x01, (0x80 or 85).toByte()))
+        assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.Battery)
+        assertEquals(85, (r as cythen.hyperdrop.device.protocol.GaiaReport.Battery).left)
+    }
 }

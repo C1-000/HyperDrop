@@ -86,7 +86,9 @@ data class CapabilityProfile(
         const val F_CODEC_TYPE = 16
         const val F_LED = 19
         const val F_ONEBRINGTWO = 20
-        const val F_SPATIAL_AUDIO = 24
+        // Official QTILFeature: SPATIAL_AUDIO wire value is 0x12 (18). 0x18 (24)
+        // is POWER_CONTROL and would never open spatial capability.
+        const val F_SPATIAL_AUDIO = 18
         const val F_ANC_V2 = 32
 
         /**

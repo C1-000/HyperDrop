@@ -122,7 +122,9 @@ object PuddingCommandTable : GaiaCommandTable {
             var i = 4
             while (i + 1 < payload.size) {
                 val id = payload[i].toInt() and 0xFF
-                val level = payload[i + 1].toInt() and 0xFF
+                val raw = payload[i + 1].toInt() and 0xFF
+                // Mask a possible charging flag in bit 7 so a high level is not lost.
+                val level = raw and 0x7F
                 if (level in 0..100) {
                     when (id) {
                         1 -> left = level
