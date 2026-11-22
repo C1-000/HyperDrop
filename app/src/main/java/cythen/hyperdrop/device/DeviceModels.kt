@@ -19,7 +19,6 @@ data class DeviceProfileSpec(
     override val displayName: String,
     override val aliases: List<String>,
     override val verified: Boolean,
-    override val note: String,
     override val imageKey: String,
     override val transports: List<PodTransport>,
     override val capabilityProfile: CapabilityProfile,
@@ -171,10 +170,9 @@ object DeviceModels {
 
     val pudding = DeviceProfileSpec(
         id = "pudding",
-        displayName = "MOONDROP PUDDING / MD-TWS-056",
-        aliases = listOf("pudding", "mdtws056"),
+        displayName = "MOONDROP PUDDING",
+        aliases = listOf("pudding", "布丁"),
         verified = true,
-        note = "Verified on real hardware (PuddingPods)",
         imageKey = "moondrop_pudding",
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilityProfile = puddingCaps,
@@ -184,10 +182,9 @@ object DeviceModels {
     /** Mirage (海市蜃楼) — the PUDDING-linked variant; reuses both archives verbatim. */
     val mirage = DeviceProfileSpec(
         id = "mirage",
-        displayName = "MOONDROP MIRAGE / 海市蜃楼",
+        displayName = "MOONDROP MIRAGE",
         aliases = listOf("mirage", "海市蜃楼"),
         verified = true,
-        note = "Verified on real hardware (PUDDING-linked variant)",
         imageKey = "moondrop_mirage",
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilityProfile = puddingCaps,
@@ -230,7 +227,6 @@ object DeviceModels {
             displayName = displayName,
             aliases = aliases,
             verified = false,
-            note = "Protocol inferred — not verified on real hardware",
             imageKey = imageKey,
             transports = listOf(PodTransport.RFCOMM_GAIA),
             capabilityProfile = caps,
@@ -311,7 +307,6 @@ object DeviceModels {
         displayName = "MOONDROP (inferred)",
         aliases = emptyList(),
         verified = false,
-        note = "Unrecognised MOONDROP model — probing capabilities, conservative command set",
         imageKey = "default",
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilityProfile = conservativeCaps,

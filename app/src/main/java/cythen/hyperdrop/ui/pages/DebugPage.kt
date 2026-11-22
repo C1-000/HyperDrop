@@ -68,7 +68,7 @@ fun DebugPage(
         }
 
         // Both the debug simulator and the adaptation page read the same DeviceProfile catalog;
-        // grouping follows the archive's verified flag and the note comes straight from its note field.
+        // grouping follows the archive's verified flag.
         val verifiedProfiles = DeviceModels.models.filter { it.verified }
         val inferredProfiles = DeviceModels.models.filter { !it.verified }
 
@@ -173,7 +173,6 @@ private fun ProfileCard(
     Card(modifier = Modifier.padding(vertical = 4.dp)) {
         BasicComponent(
             title = profile.displayName,
-            summary = profile.note.takeIf { it.isNotBlank() },
             onClick = { onAdd(profile) },
         )
     }

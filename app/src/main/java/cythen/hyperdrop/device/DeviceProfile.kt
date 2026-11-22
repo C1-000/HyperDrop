@@ -40,9 +40,6 @@ interface DeviceProfile {
     /** True only for models verified on real hardware; false = protocol inferred. */
     val verified: Boolean get() = false
 
-    /** Short provenance / caveat shown in the detail UI. */
-    val note: String get() = ""
-
     /** Stable key used to locate this model's built-in art (asset slug). */
     val imageKey: String get() = id
 

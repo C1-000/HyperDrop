@@ -17,8 +17,9 @@ class DeviceCapabilitiesTest {
     @Test
     fun `pudding profile owns its model names`() {
         assertTrue(PuddingProfile.matches("MOONDROP PUDDING"))
-        assertTrue(PuddingProfile.matches("MD-TWS-056"))
+        assertTrue(PuddingProfile.matches("布丁"))
         assertTrue(PuddingProfile.matches("pudding"))
+        assertFalse(PuddingProfile.matches("MD-TWS-056"))
         assertFalse(PuddingProfile.matches("Some random headphones"))
     }
 
@@ -205,7 +206,7 @@ class DeviceCapabilitiesTest {
     fun `layer two fallback probes and is used only for moondrop names`() {
         assertTrue(DeviceRegistry.shouldProbeOnConnect("MOONDROP something unknown"))
         assertFalse(DeviceRegistry.shouldProbeOnConnect("Sony XM5"))
-        assertTrue(DeviceRegistry.profileFor("MOONDROP something unknown").note.contains("Unrecognised"))
+        assertEquals("fallback", DeviceRegistry.profileFor("MOONDROP something unknown").id)
     }
 
     // ---- Protocol audit fixes (v1.1.2beta2) -------------------------------------
