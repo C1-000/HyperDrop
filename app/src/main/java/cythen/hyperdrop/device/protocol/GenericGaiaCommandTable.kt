@@ -14,6 +14,12 @@ class GenericGaiaCommandTable(
     private val ancSetMap: IntArray = intArrayOf(),
     private val ancGetMap: IntArray = intArrayOf(),
     private val gainMap: IntArray = intArrayOf(0, 1, 2),
+    /**
+     * Battery IDs requested by GET_BATTERY_LEVELS. Default [1, 2] = left/right (TWS).
+     * Open-fit single-ear devices (MOONDROP Pill family) report id 0 instead; their
+     * control profile passes [0, 1, 2, 3] so every advertised cell is read.
+     */
+    private val batteryIds: IntArray = intArrayOf(1, 2),
 ) : GaiaCommandTable {
 
     override val sppUuid: String = GaiaTransport.SPP_UUID
@@ -31,7 +37,10 @@ class GenericGaiaCommandTable(
     override val queryGainLevel: ByteArray = byteArrayOf(0x00, 0x1D, 0x1E, 0x01)
     override val queryLedState: ByteArray = byteArrayOf(0x00, 0x1D, 0x26, 0x01)
     override val querySupportedBatteries: ByteArray = byteArrayOf(0x00, 0x1D, 0x1A, 0x00)
-    override val queryBatteryLevels: ByteArray = byteArrayOf(0x00, 0x1D, 0x1A, 0x01, 0x01, 0x02)
+    // GET_BATTERY_LEVELS payload is the list of battery IDs to read. Default left/right,
+    // but open-fit single-ear (Pill) reports id 0; its profile supplies [0,1,2,3].
+    override val queryBatteryLevels: ByteArray =
+        byteArrayOf(0x00, 0x1D, 0x1A, 0x01, *batteryIds.map { it.toByte() }.toByteArray())
 
     override val ancCycle: List<Int> = (1..8).filter { ui -> ancSetMap.getOrNull(ui)?.let { it >= 0 } == true }
 
@@ -159,7 +168,10 @@ class GenericGaiaCommandTable(
                 // Some firmware packs a charging flag in bit 7; mask it so a charged
                 // level is not discarded just because the high bit is set.
                 val level = raw and 0x7F
+                // id 0 = single device (open-fit / Pill family). PodStatus's SINGLE_DEVICE
+                // branch prefers `left`, so map the whole-cell reading there.
                 if (level in 0..100) when (id) {
+                    0 -> left = level
                     1 -> left = level
                     2 -> right = level
                     3 -> case = level

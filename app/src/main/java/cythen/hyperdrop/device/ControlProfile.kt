@@ -51,14 +51,35 @@ data class ControlProfile(
             ancGetMap: IntArray = ancSetMap,
             gainMap: IntArray = intArrayOf(0, 1, 2),
             probeOnConnect: Boolean = false,
+            batteryIds: IntArray = intArrayOf(1, 2),
         ) = ControlProfile(
             key,
-            GenericGaiaCommandTable(path, ancSetMap, ancGetMap, gainMap),
+            GenericGaiaCommandTable(path, ancSetMap, ancGetMap, gainMap, batteryIds),
             probeOnConnect,
             path,
             ancSetMap,
             ancGetMap,
             gainMap,
+        )
+
+        /**
+         * MOONDROP Pill family (open-fit single-ear OWS). Protocol facts from HyperPILL:
+         * no ANC, identity gain map [0,1,2] (Pill's DAC_GAIN SET sends the UI index verbatim),
+         * voice prompts + volume, dual-device connection, and battery id 0 (single cell) —
+         * query all four cells and map id 0 into `left` so PodStatus's SINGLE_DEVICE branch
+         * can render it.
+         */
+        val PILL = ControlProfile(
+            key = "pill",
+            table = GenericGaiaCommandTable(
+                ancPathKind = AncPathKind.AUDIO_CURATION,
+                ancSetMap = intArrayOf(),
+                ancGetMap = intArrayOf(),
+                gainMap = intArrayOf(0, 1, 2),
+                batteryIds = intArrayOf(0, 1, 2, 3),
+            ),
+            ancPath = AncPathKind.AUDIO_CURATION,
+            gainMap = intArrayOf(0, 1, 2),
         )
 
         /**

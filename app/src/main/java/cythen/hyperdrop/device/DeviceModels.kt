@@ -261,6 +261,41 @@ object DeviceModels {
             batteryForm = BatteryForm.TWS_THREE_WAY,
         )
 
+    /**
+     * MOONDROP Pill family — open-fit single-ear (OWS) earpieces, NOT TWS earbuds.
+     * Protocol facts from HyperPILL (Moondrop Link v2.24.2c reverse engineering, real-device
+     * tested on Pill Kita Ikuyo) and MoonEar DC_PROFILES: no ANC, no spatial/LED, identity
+     * gain map, prompt tone + volume, dual-device connection, and a single battery cell
+     * reported as id 0. All Pill variants share these two archives verbatim.
+     */
+    val pillCaps = CapabilityProfile(
+        key = "pill",
+        ancModes = emptyList(),
+        gainSupported = true,
+        gainLabels = gainLabels,
+        promptToneSupported = true,
+        promptVolumeSupported = true,
+        dualConnectionSupported = true,
+        batteryForm = BatteryForm.SINGLE_DEVICE,
+    )
+
+    /** Pill-family profile: shares [pillCaps] capability + [ControlProfile.PILL] control. */
+    private fun pillProfile(
+        id: String,
+        displayName: String,
+        aliases: List<String>,
+        imageKey: String,
+    ) = DeviceProfileSpec(
+        id = id,
+        displayName = displayName,
+        aliases = aliases,
+        verified = false,
+        imageKey = imageKey,
+        transports = listOf(PodTransport.RFCOMM_GAIA),
+        capabilityProfile = pillCaps,
+        controlProfile = ControlProfile.PILL,
+    )
+
     // ---- Model catalogue (45: 2 verified + 43 inferred) ---------------------------
 
     val models: List<DeviceProfile> = listOf(
@@ -269,7 +304,8 @@ object DeviceModels {
         // One-piece / headband / neckband models: only main art is bundled → single battery.
         inferred("bianca_stigmata", "BIANCA:STIGMATA", listOf("biancastigmata", "bianca", "stigmata"), "bianca_stigmata", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("h_i_d_e_404_klukai", "H.I.D.E.404_Klukai", listOf("404klukai", "klukai"), "h_i_d_e_404_klukai"),
-        inferred("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), "laplace_oba"),
+        // MOONDROP Pill family (HyperPILL): open-fit single-ear OWS sharing the Pill archives.
+        pillProfile("laplace_oba", "LAPLACE-OBA-Ⅱ", listOf("laplaceoba", "laplace"), "laplace_oba"),
         // MoonEar real-device verified (DC_PROFILES): equal gain [0,1,2] + LED, no spatial.
         inferred("me_163_komet_moca", "Me 163 Komet MOCA", listOf("me163kometmoca", "komet"), "me_163_komet_moca", gain = gainIdentity, led = true, verified = true),
         inferred("alice", "MOONDROP Alice", listOf("alice"), "moondrop_alice"),
@@ -290,7 +326,7 @@ object DeviceModels {
         inferred("nekocake", "MOONDROP NEKOCAKE", listOf("nekocake", "neko"), "moondrop_nekocake", lhdc = true),
         inferred("moondrop_nekocake_acht_acht_limited", "Moondrop Nekocake Acht Acht Limited", listOf("nekocakeachtacht", "nekocake"), "moondrop_nekocake_acht_acht_limited"),
         inferred("moondrop_nekocake_qbz_191", "Moondrop Nekocake QBZ-191", listOf("nekocakeqbz191", "nekocake"), "moondrop_nekocake_qbz_191"),
-        inferred("pills", "MOONDROP PILLS", listOf("pills"), "moondrop_pill"),
+        pillProfile("pills", "MOONDROP PILLS", listOf("pills", "pill", "moondroppill"), "moondrop_pill"),
         inferred("moondrop_punishing_gray_raven", "Moondrop PUNISHING;GRAY RAVEN IOS", listOf("punishinggrayraven", "punishing", "raven"), "moondrop_punishing_gray_raven"),
         inferred("space_travel", "MOONDROP Space Travel", listOf("spacetravel"), "moondrop_space_travel"),
         inferred("sparks", "MOONDROP SPARKS", listOf("sparks"), "moondrop_sparks"),
@@ -303,12 +339,12 @@ object DeviceModels {
         inferred("voyager", "MOONDROP VOYAGER", listOf("voyager"), "moondrop_voyager", batteryForm = BatteryForm.SINGLE_DEVICE),
         inferred("moondrop_x_yasuno_kiyono", "MOONDROP x YASUNO KIYONO", listOf("yasunokiyono", "yasuno", "kiyono"), "moondrop_x_yasuno_kiyono"),
         inferred("nicole_reeyn", "Nicole Reeyn", listOf("nicolereeyn", "nicole", "reeyn"), "nicole_reeyn", batteryForm = BatteryForm.SINGLE_DEVICE),
-        inferred("pandaer_open_air_pill", "PANDAER Open Air Pill", listOf("openairpill"), "pandaer_open_air_pill"),
+        pillProfile("pandaer_open_air_pill", "PANDAER Open Air Pill", listOf("pandaeropenairpill", "openairpill"), "pandaer_open_air_pill"),
         inferred("pandaer_space_travel_2", "PANDAER Space Travel 2", listOf("spacetravel", "space", "travel"), "pandaer_space_travel_2"),
-        inferred("pill_gotoh_hitori", "Pill Gotoh Hitori", listOf("pillgotohhitori", "gotoh", "hitori"), "pill_gotoh_hitori"),
-        inferred("pill_ijichi_nijika", "Pill Ijichi Nijika", listOf("pillijichinijika", "ijichi", "nijika"), "pill_ijichi_nijika"),
-        inferred("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "ikuyo"), "pill_kita_ikuyo"),
-        inferred("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada"), "pill_yamada_ryo"),
+        pillProfile("pill_gotoh_hitori", "Pill Gotoh Hitori", listOf("pillgotohhitori", "gotoh", "hitori"), "pill_gotoh_hitori"),
+        pillProfile("pill_ijichi_nijika", "Pill Ijichi Nijika", listOf("pillijichinijika", "ijichi", "nijika"), "pill_ijichi_nijika"),
+        pillProfile("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "kitaikuyo", "ikuyo"), "pill_kita_ikuyo"),
+        pillProfile("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada", "ryo"), "pill_yamada_ryo"),
         inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), "punishing_gray_raven"),
         inferred("robins", "Robin's Earphones", listOf("robins", "robin", "robin's earphones"), "robin_s_earphones"),
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),

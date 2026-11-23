@@ -411,4 +411,65 @@ class DeviceCapabilitiesTest {
         assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.Battery)
         assertEquals(85, (r as cythen.hyperdrop.device.protocol.GaiaReport.Battery).left)
     }
+
+    @Test
+    fun `pill family models share dedicated single-ear archives`() {
+        val pillIds = listOf(
+            "pills", "laplace_oba", "pandaer_open_air_pill",
+            "pill_gotoh_hitori", "pill_ijichi_nijika", "pill_kita_ikuyo", "pill_yamada_ryo",
+        )
+        pillIds.forEach { id ->
+            val model = DeviceModels.models.first { it.id == id }
+            assertTrue("${model.id} must use Pill capability archive", model.capabilityProfile === DeviceModels.pillCaps)
+            assertTrue("${model.id} must use Pill control archive", model.controlProfile === ControlProfile.PILL)
+            val caps = model.capabilities
+            // Open-fit single ear: no ANC / codec / spatial / LED.
+            assertTrue(caps.ancModes.isEmpty())
+            assertFalse(caps.lhdcSupported)
+            assertFalse(caps.lc3Supported)
+            assertFalse(caps.ldacSupported)
+            assertFalse(caps.spatialAudioSupported)
+            assertFalse(caps.ledSupported)
+            // Supported: gain, prompt tone + volume, dual-device, single battery cell.
+            assertTrue(caps.gainSupported)
+            assertTrue(caps.promptToneSupported)
+            assertTrue(caps.promptVolumeSupported)
+            assertTrue(caps.dualConnectionSupported)
+            assertEquals(BatteryForm.SINGLE_DEVICE, caps.batteryForm)
+        }
+    }
+
+    @Test
+    fun `pill matches broadcaster names from the Pill product table`() {
+        assertEquals("pills", DeviceModels.match("MOONDROP Pill")?.id)
+        assertEquals("pills", DeviceModels.match("PILL")?.id)
+        assertEquals("laplace_oba", DeviceModels.match("LAPLACE-OBA-Ⅱ")?.id)
+        assertEquals("pandaer_open_air_pill", DeviceModels.match("PANDAER Open Air Pill")?.id)
+        assertEquals("pill_kita_ikuyo", DeviceModels.match("Pill Kita Ikuyo")?.id)
+        assertEquals("pill_gotoh_hitori", DeviceModels.match("Pill Gotoh Hitori")?.id)
+        assertEquals("pill_ijichi_nijika", DeviceModels.match("Pill Ijichi Nijika")?.id)
+        assertEquals("pill_yamada_ryo", DeviceModels.match("Pill Yamada Ryo")?.id)
+    }
+
+    @Test
+    fun `pill battery id zero is parsed and queried`() {
+        val table = ControlProfile.PILL.table
+        // Battery query asks for all four cells including id 0 (single device).
+        assertEquals(
+            "00 1D 1A 01 00 01 02 03",
+            table.queryBatteryLevels.joinToString(" ") { "%02X".format(it) },
+        )
+        // A single-cell response [id=0, level] maps into `left` so SINGLE_DEVICE renders it.
+        val r = table.parse(byteArrayOf(0, 0x1D, 0x1B, 0x01, 0x00, 72))
+        assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.Battery)
+        val battery = r as cythen.hyperdrop.device.protocol.GaiaReport.Battery
+        assertEquals(72, battery.left)
+        assertNull(battery.right)
+        assertNull(battery.case)
+        // Identity gain map sends the UI index verbatim (Pill DAC_GAIN SET).
+        assertEquals(
+            "00 1D 1E 02 02",
+            table.setGainLevel(2)!!.joinToString(" ") { "%02X".format(it) },
+        )
+    }
 }
