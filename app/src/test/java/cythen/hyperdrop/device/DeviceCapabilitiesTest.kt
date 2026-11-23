@@ -91,12 +91,14 @@ class DeviceCapabilitiesTest {
         assertEquals("fallback", DeviceModels.match("MOONDROP something new")?.id)
         // Non-MOONDROP name is not a supported device.
         assertNull(DeviceModels.match("Some random headphones"))
-        assertEquals(7, DeviceModels.models.count { it.verified })
-        // MoonEar real-device verified models (+ MIRAGE linked variant). Space Travel 2
-        // Ultra is NOT verified: it was reported as human-tested but has no published
-        // control commands, so it stays conservative and inferred (verified=false).
+        // 16 verified = 6 MoonEar + MIRAGE + 7 Pill family + ZZZ-ANGELS-OWS + Robin.
+        // Space Travel 2 Ultra stays inferred: no published control commands.
+        assertEquals(16, DeviceModels.models.count { it.verified })
         listOf("golden_ages", "golden_ages_2", "space_travel_2",
-            "moondrop_u_c_t_s", "me_163_komet_moca", "pudding").forEach { id ->
+            "moondrop_u_c_t_s", "me_163_komet_moca", "pudding", "mirage",
+            "pills", "laplace_oba", "pandaer_open_air_pill",
+            "pill_gotoh_hitori", "pill_ijichi_nijika", "pill_kita_ikuyo",
+            "pill_yamada_ryo", "zzz_angels_ows", "robins").forEach { id ->
             assertTrue("$id must be verified", DeviceRegistry.profileById(id).verified)
         }
     }
@@ -184,9 +186,9 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
-    fun `model catalogue has 45 unique image keys with seven verified`() {
+    fun `model catalogue has 45 unique image keys with sixteen verified`() {
         assertEquals(45, DeviceModels.models.size)
-        assertEquals(7, DeviceModels.models.count { it.verified })
+        assertEquals(16, DeviceModels.models.count { it.verified })
         val keys = DeviceModels.models.map { it.imageKey }
         assertEquals("imageKey must be unique", keys.size, keys.toSet().size)
         // Every imageKey except the deliberate fallback resolves to a bundled set.
@@ -417,25 +419,27 @@ class DeviceCapabilitiesTest {
         val pillIds = listOf(
             "pills", "laplace_oba", "pandaer_open_air_pill",
             "pill_gotoh_hitori", "pill_ijichi_nijika", "pill_kita_ikuyo", "pill_yamada_ryo",
+            "zzz_angels_ows",
         )
         pillIds.forEach { id ->
             val model = DeviceModels.models.first { it.id == id }
             assertTrue("${model.id} must use Pill capability archive", model.capabilityProfile === DeviceModels.pillCaps)
             assertTrue("${model.id} must use Pill control archive", model.controlProfile === ControlProfile.PILL)
+            assertTrue("${model.id} must be verified", model.verified)
             val caps = model.capabilities
-            // Open-fit single ear: no ANC / codec / spatial / LED.
+            // Open-fit OWS: no ANC / codec / spatial / LED.
             assertTrue(caps.ancModes.isEmpty())
             assertFalse(caps.lhdcSupported)
             assertFalse(caps.lc3Supported)
             assertFalse(caps.ldacSupported)
             assertFalse(caps.spatialAudioSupported)
             assertFalse(caps.ledSupported)
-            // Supported: gain, prompt tone + volume, dual-device, single battery cell.
+            // Supported: gain, prompt tone + volume, dual-device, left+right battery (no case).
             assertTrue(caps.gainSupported)
             assertTrue(caps.promptToneSupported)
             assertTrue(caps.promptVolumeSupported)
             assertTrue(caps.dualConnectionSupported)
-            assertEquals(BatteryForm.SINGLE_DEVICE, caps.batteryForm)
+            assertEquals(BatteryForm.TWS_TWO_WAY, caps.batteryForm)
         }
     }
 
@@ -449,27 +453,77 @@ class DeviceCapabilitiesTest {
         assertEquals("pill_gotoh_hitori", DeviceModels.match("Pill Gotoh Hitori")?.id)
         assertEquals("pill_ijichi_nijika", DeviceModels.match("Pill Ijichi Nijika")?.id)
         assertEquals("pill_yamada_ryo", DeviceModels.match("Pill Yamada Ryo")?.id)
+        assertEquals("zzz_angels_ows", DeviceModels.match("ZZZ-ANGELS-OWS")?.id)
     }
 
     @Test
-    fun `pill battery id zero is parsed and queried`() {
+    fun `pill battery queries left and right with no case`() {
         val table = ControlProfile.PILL.table
-        // Battery query asks for all four cells including id 0 (single device).
+        // Real-device capture: support response `1D 1B 00 01 02` = left + right only,
+        // so the query asks for cells [1,2] — there is NO charging case.
         assertEquals(
-            "00 1D 1A 01 00 01 02 03",
+            "00 1D 1A 01 01 02",
             table.queryBatteryLevels.joinToString(" ") { "%02X".format(it) },
         )
-        // A single-cell response [id=0, level] maps into `left` so SINGLE_DEVICE renders it.
-        val r = table.parse(byteArrayOf(0, 0x1D, 0x1B, 0x01, 0x00, 72))
+        // Two-cell response [id=1,left][id=2,right] -> left=100, right=80, no case.
+        val r = table.parse(byteArrayOf(0, 0x1D, 0x1B, 0x01, 0x01, 100, 0x02, 80))
         assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.Battery)
         val battery = r as cythen.hyperdrop.device.protocol.GaiaReport.Battery
-        assertEquals(72, battery.left)
-        assertNull(battery.right)
+        assertEquals(100, battery.left)
+        assertEquals(80, battery.right)
         assertNull(battery.case)
         // Identity gain map sends the UI index verbatim (Pill DAC_GAIN SET).
         assertEquals(
             "00 1D 1E 02 02",
             table.setGainLevel(2)!!.joinToString(" ") { "%02X".format(it) },
         )
+    }
+
+    @Test
+    fun `space travel 2 reports left and right battery with no case`() {
+        val caps = DeviceRegistry.detectDeviceCapabilities("Space Travel 2")
+        assertEquals(BatteryForm.TWS_TWO_WAY, caps.batteryForm)
+        assertTrue(caps.gainSupported)
+        assertTrue(caps.promptToneSupported)
+        assertTrue(caps.dualConnectionSupported)
+        assertFalse(caps.lhdcSupported)
+        assertFalse(caps.lc3Supported)
+        assertFalse(caps.ldacSupported)
+    }
+
+    @Test
+    fun `robin uses the real-device three-state ANC profile`() {
+        val model = DeviceModels.models.first { it.id == "robins" }
+        assertTrue(model.verified)
+        assertTrue(model.capabilityProfile === DeviceModels.robinCaps)
+        assertTrue(model.controlProfile === ControlProfile.ROBIN)
+        val caps = model.capabilities
+        assertEquals(BatteryForm.TWS_TWO_WAY, caps.batteryForm)
+        assertEquals(1, caps.ancModes.size)
+        assertFalse(caps.gainSupported)
+        assertFalse(caps.spatialAudioSupported)
+        // Alias rules from HyperEars: full name, moondrop+robin, and 水月雨+知更鸟.
+        assertEquals("robins", DeviceModels.match("ROBIN'S EARPHONES")?.id)
+        assertEquals("robins", DeviceModels.match("MOONDROP Robin")?.id)
+        assertEquals("robins", DeviceModels.match("水月雨知更鸟")?.id)
+        // SET values off=01 / ANC=02 / transparency=04; GET index 00/01/02 -> UI 1/2/3.
+        val table = ControlProfile.ROBIN.table
+        assertEquals("00 1D 10 04 01", table.setNoiseMode(1)!!.joinToString(" ") { "%02X".format(it) }) // off
+        assertEquals("00 1D 10 04 02", table.setNoiseMode(2)!!.joinToString(" ") { "%02X".format(it) }) // ANC
+        assertEquals("00 1D 10 04 04", table.setNoiseMode(3)!!.joinToString(" ") { "%02X".format(it) }) // transparency
+        // GET responses 00/01/02 -> ui 1(OFF)/2(NC)/3(TRANSPARENCY).
+        assertEquals(1, (table.parse(byteArrayOf(0, 0x1D, 0x11, 0x03, 0x00)) as cythen.hyperdrop.device.protocol.GaiaReport.AncMode).uiStatus)
+        assertEquals(2, (table.parse(byteArrayOf(0, 0x1D, 0x11, 0x03, 0x01)) as cythen.hyperdrop.device.protocol.GaiaReport.AncMode).uiStatus)
+        assertEquals(3, (table.parse(byteArrayOf(0, 0x1D, 0x11, 0x03, 0x02)) as cythen.hyperdrop.device.protocol.GaiaReport.AncMode).uiStatus)
+    }
+
+    @Test
+    fun `battery cell id zero still parses as left for family compatibility`() {
+        // The generic command table retains id=0 -> left for other family members even
+        // though Pill now queries [1,2].
+        val table = cythen.hyperdrop.device.protocol.GenericGaiaCommandTable()
+        val r = table.parse(byteArrayOf(0, 0x1D, 0x1B, 0x01, 0x00, 72))
+        assertTrue(r is cythen.hyperdrop.device.protocol.GaiaReport.Battery)
+        assertEquals(72, (r as cythen.hyperdrop.device.protocol.GaiaReport.Battery).left)
     }
 }

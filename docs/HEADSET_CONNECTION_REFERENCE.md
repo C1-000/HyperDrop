@@ -110,7 +110,7 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 
 这解决了 "Robin's Earphones" 这类显示名不含 "moondrop" 的机型被名字门禁拦死的问题。HyperDrop 当前仍用纯别名匹配（`DeviceModels.match()`：最长别名 contains → 名字含 MOONDROP/水月雨走 fallback → 否则 null）；本轮按用户要求**不改识别算法**，仅把 robin 的别名补上 "robin's earphones"。协议指纹学习作为后续候选方案记录于此。
 
-## 7. 七款真机验证机型的能力与控制方案
+## 7. 真机验证机型的能力与控制方案
 
 来源：MoonEar README L99–105（实机验证清单）+ `ADAPTATION.md` + `AncProfileLib.kt` 的 `PROFILES` / `ANC_V2_PROFILES` / `DC_PROFILES`。
 
@@ -118,19 +118,21 @@ MoonEar `DeviceMatcher.kt` 三级判定：
 |---|---|---|---|---|
 | 梦回2 / Golden Ages 2 (GA2) | GAIA over GATT | AudioCuration 4 档，SET `[1,2,4,3]` / GET `[0,1,2,3]` | 三档增益 `gainMap=[2,1,0]`，无 LED，无充电盒电量；**有空间音频**（真机反馈）、**LC3 + LDAC 编码** | `PROFILES` + `DC_PROFILES` |
 | 梦回1979 / Golden Ages | GAIA | 与 GA2 同平台/主控 | 三档增益、无 LED；**LC3 + LDAC 编码** | 验证通过 |
-| 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED；**提示音 + 双设备连接**；**无 codec 设置** | 涉及 9ECA 私有协议；HyperDrop 显示名更正为 "Space Travel 2"（用户真机反馈 2026-11-22） |
+| 太空漫游2 / Space Travel 2 | GAIA over GATT（BT8932F） | AudioCuration 4 档 `[1,2,4,3]` / `[0,1,2,3]` | 三档增益 `[2,1,0]`，无空间/LED；**提示音 + 双设备连接**；**无 codec 设置**；**仅左右耳电量、无充电盒**（`BatteryForm.TWS_TWO_WAY`，用户反馈 2026-11-23） | 涉及 9ECA 私有协议；HyperDrop 显示名更正为 "Space Travel 2"（用户真机反馈 2026-11-22） |
 | 太空漫游2 ULTRA | 国产 SoC | 仅记"实机验证通过"，无公开控制命令；HyperDrop 按保守推断处理 | — | `verified=false`，未纳入实机验证档案 |
 | U.C.T.S (MD-OWS-014) | GAIA | 开放式耳机，**硬件无降噪** | 左右耳电量正常 | 无 ANC 能力 |
 | 布丁 PUDDING (MD-TWS-056) | GAIA V4 / RFCOMM | ANC_V2 5 档：关0/自适应1/通透2/抗风3/基础4；GET 方向 `[0,4,2,3,1]` | 三路电量、三档增益 `[2,1,0]`、指示灯、LHDC | `ANC_V2_PROFILES` + `DC_PROFILES`；`gainFeature=0x1E`、`ledFeature=0x26` |
 | 猫咖 MOCA | 疑似蓝讯 BT5.4/LC3 | — | 三档增益 + 指示灯 | `DC_PROFILES` |
+| 知更鸟 Robin (Robin's Earphones) | SPP / RFCOMM | AudioCuration 三态：GET `1D 10 03`→00关/01降噪/02通透；SET `1D 10 04`→关01/降噪02/通透04（**SET 与 GET 值不同**） | **仅左右耳电量、无充电盒/充电状态**；无增益/编码/空间/LED | 来源 HyperEars `moondrop-robin-protocol.md`（Star-ZER0 协议，CC BY-SA 4.0）；写后首次查询可能返回旧值，靠 5s 写确认 grace + 有界回读矫正 |
+| Pill 系列（PILL / LAPLACE-OBA-Ⅱ / PANDAER Open Air Pill / 四款 BOCCHI 联名 / ZZZ-ANGELS-OWS） | SPP / RFCOMM | **无降噪硬件**（抓包 `1D40`/`1D41` 零条），不开放任何 ANC 模式 | **仅左右耳电量、无充电盒**（支持组件响应 `1D 1B 00 01 02`）；三档增益 identity `[0,1,2]`、提示音+音量、双设备连接；无编码/空间/LED | 来源 HyperEars `moondrop-pill-protocol.md`（实机抓包固件 1.6.0）+ HyperPILL；Pill 是 ZZZ-ANGELS-OWS 基础款，共用同一 GAIA 子集，两者共享档案 |
 
 **PUDDING ANC 细节**：SET `00 1D 40 04 <mode>`，RX `00 1D 41 04 <mode>`；mode 关=0x00 / 自适应=0x01 / 通透=0x02 / 抗风=0x03 / 基础降噪=0x04。UI 顺序为 关/降噪/通透/抗风/自适应 (`ANC_UI_ORDER = [1,0,2,4,5,3]`)。这与 HyperDrop `PuddingCommandTable` 的 wire 值完全一致（HyperDrop 的 UI status 编号 1..5 与之不同，但映射表已对齐）。
 
 **AudioCuration SET 回显 vs GET 响应的编号差异（ANC 切换 UI 回弹根因，2026-11-22 修复）**：GA2 / Space Travel 2 / Ultrasonic 等 AudioCuration 机型，SET 用 wire 枚举 `[1,2,4,3]`（关/降噪/通透/智能），但 GET_CURRENT_MODE 返回的是 **0-based 索引** `[0,1,2,3]`。二者编号体系不同，不能用同一张映射表解码：`GenericGaiaCommandTable.parse` 现按 sub 区分——SET 回显（sub=0x04）用 `ancSetMap` 的 wire→UI 反查，GET 响应（sub=0x03）用 `ancGetMap` 的索引→UI 映射。旧实现把 GET 索引表套在 SET 回显上（wire=2 被误读为 index=2→通透），导致点击"降噪"后 UI 弹到错误档位、再点一次才正常。`DeviceSession` 另加 5 秒写确认 grace：SET 后短暂忽略与写入值冲突的回包，防止设备未 settle 时的旧值回弹。
 
-**其它已归档但为"理论支持"的机型**：ALICE (QCC5151)、SPARKS (QCC3040)、VOYAGER (QCC5144)、NEKOCAKE (BT8922E)、PILL (BT8932F)、ULTRASONIC (BT8952F)、Robin (BT8952F)、太空漫游一代、方糖 BLOCK、羽翼 EDGE·EDGE2。
+**其它已归档但为"理论支持"的机型**：ALICE (QCC5151)、SPARKS (QCC3040)、VOYAGER (QCC5144)、NEKOCAKE (BT8922E)、ULTRASONIC (BT8952F)、太空漫游一代、方糖 BLOCK、羽翼 EDGE·EDGE2。
 
-> HyperDrop 已把上表中 6 款有实际控制命令数据的 MoonEar 实机验证机型（GA2、梦回1979、太空漫游2、U.C.T.S、PUDDING、MOCA）的能力与控制映射加入档案并标 `verified=true`，加上布丁联动版 MIRAGE（与 PUDDING 共享同一档案），共 7 款 verified。太空漫游2 ULTRA 虽被参考项目记为"实机验证通过"，但无公开控制命令数据，按保守推断处理（`verified=false`），其编码/双连等能力由回包驱动观测开放。其余 38 款仍为协议推断。建议后续用真机日志逐款核对增益/LED/ANC 细节。
+> HyperDrop 的 verified 机型现为 16 款：6 款有实际控制命令数据的 MoonEar 实机验证机型（GA2、梦回1979、太空漫游2、U.C.T.S、PUDDING、MOCA）+ 布丁联动版 MIRAGE（与 PUDDING 共享档案）+ 7 款 Pill 系列（HyperEars/HyperPILL 实机抓包，含 LAPLACE-OBA-Ⅱ、PANDAER Open Air Pill、四款 BOCCHI 联名、PILL）+ ZZZ-ANGELS-OWS（Pill 基础款衍生，共用档案）+ Robin（HyperEars 实机协议）。Space Travel 2 与 Pill 系列均为**仅左右耳、无充电盒电量**，由新能力形态 `BatteryForm.TWS_TWO_WAY` 表达。太空漫游2 ULTRA 虽被记为"实机验证通过"，但无公开控制命令数据，仍按保守推断处理（`verified=false`）。其余 29 款仍为协议推断。建议后续用真机日志逐款核对增益/LED/ANC 细节。
 
 ## 8. Codec（编码）控制方案
 

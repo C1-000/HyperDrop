@@ -22,8 +22,8 @@ android {
         applicationId = "cythen.hyperdrop"
         minSdk = 35
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.1.4"
+        versionCode = 24
+        versionName = "1.1.5"
         buildConfigField("long", "BUILD_TIMESTAMP", System.currentTimeMillis().toString())
     }
 

@@ -16,6 +16,9 @@ enum class BatteryForm {
     /** One whole-device battery, rendered as a single column. */
     SINGLE_DEVICE,
 
+    /** Left / right only, no charging case — a two-column layout (Pill, Space Travel 2). */
+    TWS_TWO_WAY,
+
     /** No battery readout at all — hide the battery card. */
     NONE,
 }

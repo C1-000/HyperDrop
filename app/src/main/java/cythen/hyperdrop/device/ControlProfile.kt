@@ -63,11 +63,11 @@ data class ControlProfile(
         )
 
         /**
-         * MOONDROP Pill family (open-fit single-ear OWS). Protocol facts from HyperPILL:
-         * no ANC, identity gain map [0,1,2] (Pill's DAC_GAIN SET sends the UI index verbatim),
-         * voice prompts + volume, dual-device connection, and battery id 0 (single cell) —
-         * query all four cells and map id 0 into `left` so PodStatus's SINGLE_DEVICE branch
-         * can render it.
+         * MOONDROP Pill family (open-fit OWS). Protocol facts from HyperEars real-device
+         * capture (firmware 1.6.0) and HyperPILL: no ANC, identity gain map [0,1,2] (Pill's
+         * DAC_GAIN SET sends the UI index verbatim), voice prompts + volume, dual-device
+         * connection. Battery: support response `1D 1B 00 01 02` reports left + right only,
+         * so query cells [1,2] — there is NO charging case cell.
          */
         val PILL = ControlProfile(
             key = "pill",
@@ -76,11 +76,24 @@ data class ControlProfile(
                 ancSetMap = intArrayOf(),
                 ancGetMap = intArrayOf(),
                 gainMap = intArrayOf(0, 1, 2),
-                batteryIds = intArrayOf(0, 1, 2, 3),
+                batteryIds = intArrayOf(1, 2),
             ),
             ancPath = AncPathKind.AUDIO_CURATION,
             gainMap = intArrayOf(0, 1, 2),
         )
+
+        /**
+         * MOONDROP Robin (知更鸟) — real-device protocol from HyperEars. ANC uses the
+         * AudioCuration path with three states whose SET and GET wire values differ:
+         *   GET `1D 10 03` → 00=off / 01=ANC / 02=transparency (indexed sequentially);
+         *   SET `1D 10 04` → off=01 / ANC=02 / transparency=04.
+         * The set/get maps below encode exactly that; the shared GenericGaiaCommandTable's
+         * SET-echo-vs-GET sub dispatch (v1.1.3) routes each response through the right map.
+         * Battery is left + right only (no charging case).
+         */
+        private val ROBIN_ANC_SET = intArrayOf(-1, 1, 2, 4, -1, -1, -1, -1, -1)
+        private val ROBIN_ANC_GET = intArrayOf(1, 2, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
+        val ROBIN = generic("robin", AncPathKind.AUDIO_CURATION, ROBIN_ANC_SET, ROBIN_ANC_GET)
 
         /**
          * Layer-2 fallback for a completely unrecognised device: probe capabilities first,

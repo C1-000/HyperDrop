@@ -262,11 +262,11 @@ object DeviceModels {
         )
 
     /**
-     * MOONDROP Pill family — open-fit single-ear (OWS) earpieces, NOT TWS earbuds.
-     * Protocol facts from HyperPILL (Moondrop Link v2.24.2c reverse engineering, real-device
-     * tested on Pill Kita Ikuyo) and MoonEar DC_PROFILES: no ANC, no spatial/LED, identity
-     * gain map, prompt tone + volume, dual-device connection, and a single battery cell
-     * reported as id 0. All Pill variants share these two archives verbatim.
+     * MOONDROP Pill family — open-fit (OWS) earpieces, NOT classic TWS earbuds.
+     * Protocol facts from HyperEars real-device capture (firmware 1.6.0) and HyperPILL:
+     * no ANC, no spatial/LED, identity gain map, prompt tone + volume, dual-device
+     * connection, and left + right battery cells with NO charging case. ZZZ-ANGELS-OWS is
+     * the same hardware family (Pill is its base model) and shares both archives verbatim.
      */
     val pillCaps = CapabilityProfile(
         key = "pill",
@@ -276,7 +276,7 @@ object DeviceModels {
         promptToneSupported = true,
         promptVolumeSupported = true,
         dualConnectionSupported = true,
-        batteryForm = BatteryForm.SINGLE_DEVICE,
+        batteryForm = BatteryForm.TWS_TWO_WAY,
     )
 
     /** Pill-family profile: shares [pillCaps] capability + [ControlProfile.PILL] control. */
@@ -289,11 +289,38 @@ object DeviceModels {
         id = id,
         displayName = displayName,
         aliases = aliases,
-        verified = false,
+        verified = true,
         imageKey = imageKey,
         transports = listOf(PodTransport.RFCOMM_GAIA),
         capabilityProfile = pillCaps,
         controlProfile = ControlProfile.PILL,
+    )
+
+    /**
+     * MOONDROP Robin (知更鸟) — real-device protocol from HyperEars. Three ANC states (off /
+     * noise-cancellation / transparency) over the AudioCuration path, left + right battery
+     * only (no case), no codec/LED/gain/spatial. A single noise-cancellation strength is
+     * exposed so the ANC card renders its three mode buttons without a strength picker.
+     */
+    val robinCaps = CapabilityProfile(
+        key = "robin",
+        // Three states (off/ANC/transparency) but no adaptive tier: keep adaptiveSupported
+        // false so the MiLink cycle is [ANC, transparency, off] with no mode 4.
+        adaptiveSupported = false,
+        ancModes = listOf(AncModeOption(NoiseControlMode.NOISE_CANCELLATION, R.string.noise_cancellation_title)),
+        batteryForm = BatteryForm.TWS_TWO_WAY,
+    )
+
+    /** Robin profile: shares [robinCaps] capability + [ControlProfile.ROBIN] control. */
+    private val robin = DeviceProfileSpec(
+        id = "robins",
+        displayName = "Robin's Earphones",
+        aliases = listOf("robins", "robin", "robin's earphones", "知更鸟"),
+        verified = true,
+        imageKey = "robin_s_earphones",
+        transports = listOf(PodTransport.RFCOMM_GAIA),
+        capabilityProfile = robinCaps,
+        controlProfile = ControlProfile.ROBIN,
     )
 
     // ---- Model catalogue (45: 2 verified + 43 inferred) ---------------------------
@@ -346,7 +373,7 @@ object DeviceModels {
         pillProfile("pill_kita_ikuyo", "Pill Kita Ikuyo", listOf("pillkitaikuyo", "kitaikuyo", "ikuyo"), "pill_kita_ikuyo"),
         pillProfile("pill_yamada_ryo", "Pill Yamada Ryo", listOf("pillyamadaryo", "yamada", "ryo"), "pill_yamada_ryo"),
         inferred("punishing_gray_raven", "PUNISHING:GRAY RAVEN", listOf("punishinggrayraven", "punishing", "raven"), "punishing_gray_raven"),
-        inferred("robins", "Robin's Earphones", listOf("robins", "robin", "robin's earphones"), "robin_s_earphones"),
+        robin,
         inferred("space_force", "Space Force", listOf("spaceforce", "space", "force"), "space_force"),
         // MoonEar real-device verified: AudioCuration 4-gang [1,2,4,3]/[0,1,2,3] (default),
         // reversed gain, no spatial/LED (2026-09-01 two-way measured data in MoonEar).
@@ -355,13 +382,16 @@ object DeviceModels {
         inferred(
             "space_travel_2", "Space Travel 2", listOf("spacetravel2", "st2"), "space_travel_2",
             gain = gainReversed, promptTone = true, dualConnection = true, verified = true,
+            batteryForm = BatteryForm.TWS_TWO_WAY,
         ),
         // Space Travel 2 Ultra: MoonEar only records "verified working" with no control
         // command data and unpublished protocol. Keep conservative capabilities and treat
         // as protocol-inferred until real control mappings are known.
         inferred("space_travel_2_ultra", "MOONDROP Space Travel 2 Ultra", listOf("spacetravel2ultra"), "space_travel_2_ultra", gain = gainReversed),
         inferred("susanoo_tws", "SUSANOO TWS", listOf("susanoo"), "susanoo_tws"),
-        inferred("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), "zzz_angels_ows"),
+        // ZZZ-ANGELS-OWS (A-Z 联名耳夹) is the same hardware family as Pill (its base model);
+        // HyperEars confirms both share one GAIA subset. Reuses the Pill archives verbatim.
+        pillProfile("zzz_angels_ows", "ZZZ-ANGELS-OWS", listOf("zzzangelsows", "angels"), "zzz_angels_ows"),
     )
 
     val byAlias: List<Pair<String, DeviceProfile>> = models

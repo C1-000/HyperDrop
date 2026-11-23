@@ -73,6 +73,29 @@ fun PodStatus(
                     compact = compact
                 )
             }
+            BatteryForm.TWS_TWO_WAY -> {
+                // Open-fit / Pill family and Space Travel 2: left + right only, no case.
+                BatteryColumn(
+                    label = stringResource(R.string.batt_left_pod),
+                    pod = batteryParams.left,
+                    wearState = wearStatus.left,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+                Box(
+                    modifier = Modifier
+                        .width(0.5.dp)
+                        .height(dividerHeight)
+                        .background(dividerColor)
+                )
+                BatteryColumn(
+                    label = stringResource(R.string.batt_right_pod),
+                    pod = batteryParams.right,
+                    wearState = wearStatus.right,
+                    modifier = Modifier.weight(1f),
+                    compact = compact
+                )
+            }
             else -> {
                 BatteryColumn(
                     label = stringResource(R.string.batt_left_pod),

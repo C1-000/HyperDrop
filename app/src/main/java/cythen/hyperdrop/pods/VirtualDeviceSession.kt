@@ -202,14 +202,18 @@ object VirtualDeviceSession {
         currentTransparencyVocalEnhancement = false
         currentEqPreset = -1
         currentWearStatus = WearStatus(left = WearState.WEARING, right = WearState.WEARING, case = null)
-        currentBatteryParams = if (capabilities.batteryForm == BatteryForm.SINGLE_DEVICE) {
-            BatteryParams(
+        currentBatteryParams = when (capabilities.batteryForm) {
+            BatteryForm.SINGLE_DEVICE -> BatteryParams(
                 left = PodParams(battery = 88, isCharging = false, isConnected = true),
                 right = null,
                 case = PodParams(battery = 91, isCharging = true, isConnected = true),
             )
-        } else {
-            BatteryParams(
+            BatteryForm.TWS_TWO_WAY -> BatteryParams(
+                left = PodParams(battery = 88, isCharging = false, isConnected = true),
+                right = PodParams(battery = 76, isCharging = false, isConnected = true),
+                case = null,
+            )
+            else -> BatteryParams(
                 left = PodParams(battery = 88, isCharging = false, isConnected = true),
                 right = PodParams(battery = 76, isCharging = false, isConnected = true),
                 case = PodParams(battery = 91, isCharging = true, isConnected = true),
