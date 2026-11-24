@@ -2,6 +2,7 @@ package cythen.hyperdrop.hook
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -61,14 +62,16 @@ object SettingsHeadsetHook : HookContext() {
         hookServiceProxy()
         hookBatteryView()
         hookFragmentState()
+        hookDeviceProfilesSettings()
+        hookBypassXiaomiHeadsetPage()
     }
 
 
     /**
-     * Bridge into the Settings process so HyperDrop can open the real generic Bluetooth
-     * device-details fragment (the page containing media/call audio, volume sync, LHDC and
-     * low-latency switches on HyperOS). Launching SubSettings directly from a third-party UID
-     * is restricted on some builds, so the actual startActivity call is performed from Settings.
+     * Bridge into the Settings process so HyperDrop can open Xiaomi's ordinary Bluetooth
+     * device detail page (DeviceProfilesSettings) for the headset. Launching SubSettings
+     * directly from a third-party UID is restricted on some builds, so the actual
+     * startActivity call is performed from Settings.
      */
     private fun hookDeviceDetailsBridge() {
         runCatching {
@@ -96,18 +99,26 @@ object SettingsHeadsetHook : HookContext() {
     }
 
     private fun openGenericBluetoothDetailsInsideSettings(context: Context, address: String) {
-        val args = Bundle().apply { putString("device_address", address) }
+        val device = runCatching { BluetoothAdapter.getDefaultAdapter()?.getRemoteDevice(address) }.getOrNull()
+        if (device == null) {
+            runCatching {
+                context.startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }.onFailure { Log.e(TAG, "Bluetooth settings fallback failed", it) }
+            return
+        }
+        val args = Bundle().apply { putParcelable("device", device) }
         val subSettings = Intent().apply {
             setClassName("com.android.settings", "com.android.settings.SubSettings")
-            putExtra(":settings:show_fragment", "com.android.settings.bluetooth.BluetoothDeviceDetailsFragment")
+            putExtra(":settings:show_fragment", "com.android.settings.bluetooth.DeviceProfilesSettings")
             putExtra(":settings:show_fragment_args", args)
-            putExtra("device_address", address)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         runCatching { context.startActivity(subSettings) }
-            .onSuccess { Log.d(TAG, "opened BluetoothDeviceDetailsFragment address=$address") }
+            .onSuccess { Log.d(TAG, "opened DeviceProfilesSettings address=$address") }
             .onFailure { first ->
-                Log.w(TAG, "SubSettings Bluetooth details failed, falling back to Bluetooth settings", first)
+                Log.w(TAG, "SubSettings DeviceProfilesSettings failed, falling back to Bluetooth settings", first)
                 runCatching {
                     context.startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -576,6 +587,7 @@ object SettingsHeadsetHook : HookContext() {
     private val puddingAncUi = WeakHashMap<Any, PuddingAncUi>()
     private const val ANC_LABEL_ROW_TAG = "hyperdrop_anc_three_labels_v2"
     private const val APP_SETTINGS_KEY = "hyperdrop_app_settings"
+    private const val DEVICE_CONTROL_KEY = "hyperdrop_device_control"
 
     /**
      * Device id 01010607 selects a native HyperOS template whose framework control is
@@ -821,6 +833,108 @@ object SettingsHeadsetHook : HookContext() {
         }.onFailure { Log.w(TAG, "failed to add 应用设置 preference", it) }
     }
 
+    /**
+     * The Binder-side checkSupport spoof in com.android.bluetooth makes Xiaomi Settings treat
+     * MOONDROP headsets as supported, so checkStartMiuiHeadset returns true and Settings opens
+     * the Xiaomi headset page instead of the ordinary Bluetooth detail page. Short-circuit it
+     * for our devices so clicks land on DeviceProfilesSettings (which now carries the
+     * headset-control preference). The Bluetooth-side spoof stays intact for battery/ANC.
+     */
+    private fun hookBypassXiaomiHeadsetPage() {
+        runCatching {
+            hookBefore(findMethodByParamCount(
+                "com.android.settings.bluetooth.MiuiBluetoothSettings",
+                "checkStartMiuiHeadset",
+                1
+            )) {
+                val cached = args.firstOrNull()
+                val device = runCatching { callMethod(cached, "getDevice") as? BluetoothDevice }.getOrNull()
+                if (device != null && isOppoPod(device)) {
+                    Log.d(TAG, "bypassing Xiaomi headset page for ${device.address}")
+                    result = false
+                }
+            }
+        }.onFailure { Log.w(TAG, "hook checkStartMiuiHeadset skipped", it) }
+    }
+    /**
+     * Xiaomi's ordinary Bluetooth detail page (DeviceProfilesSettings) is the page MOONDROP
+     * headsets land on when the Xiaomi headset page is bypassed. Add one preference that
+     * opens HyperDrop's own DeviceDetailActivity with the device attached.
+     */
+    private fun hookDeviceProfilesSettings() {
+        runCatching {
+            hookAfter(findMethod("com.android.settings.bluetooth.DeviceProfilesSettings", "onCreate", Bundle::class.java)) {
+                ensureDeviceControlPreference(instance)
+            }
+        }.onFailure { Log.w(TAG, "hook DeviceProfilesSettings.onCreate skipped", it) }
+
+        runCatching {
+            hookAfter(findMethodByParamCount("com.android.settings.bluetooth.DeviceProfilesSettings", "onResume", 0)) {
+                ensureDeviceControlPreference(instance)
+            }
+        }.onFailure { Log.w(TAG, "hook DeviceProfilesSettings.onResume skipped", it) }
+    }
+
+    /**
+     * Add a headset-control preference to DeviceProfilesSettings for recognized MOONDROP
+     * devices. The device is resolved from mCachedDevice, falling back to the
+     * mDeviceMacAddress field.
+     */
+    private fun ensureDeviceControlPreference(fragment: Any?) {
+        if (fragment == null) return
+        val device = runCatching {
+            val cached = getObjectField(fragment, "mCachedDevice")
+            callMethod(cached, "getDevice") as? BluetoothDevice
+        }.getOrNull() ?: runCatching {
+            val address = getObjectField(fragment, "mDeviceMacAddress") as? String
+            if (address.isNullOrBlank()) null else BluetoothAdapter.getDefaultAdapter()?.getRemoteDevice(address)
+        }.getOrNull()
+        if (device == null || !isOppoPod(device)) return
+
+        val screen = runCatching { callMethod(fragment, "getPreferenceScreen") }.getOrNull() ?: return
+        val ctx = runCatching { callMethod(fragment, "getContext") as? Context }.getOrNull() ?: context ?: return
+
+        data class PrefLocation(val pref: Any, val parent: Any)
+        var existing: Any? = null
+        var anchor: PrefLocation? = null
+
+        fun walk(group: Any) {
+            val count = runCatching { callMethod(group, "getPreferenceCount") as? Int }.getOrNull() ?: return
+            for (i in 0 until count) {
+                val pref = runCatching { callMethod(group, "getPreference", i) }.getOrNull() ?: continue
+                val key = runCatching { callMethod(pref, "getKey")?.toString().orEmpty() }.getOrDefault("")
+                if (key == DEVICE_CONTROL_KEY) existing = pref
+                if (key == "unpair") anchor = PrefLocation(pref, group)
+                runCatching { callMethod(pref, "getPreferenceCount") as? Int }.getOrNull()?.let { nested ->
+                    if (nested >= 0) walk(pref)
+                }
+            }
+        }
+        walk(screen)
+        if (existing != null) return
+
+        runCatching {
+            val prefClass = Class.forName("androidx.preference.Preference", false, appClassLoader)
+            val pref = prefClass.getConstructor(Context::class.java).newInstance(ctx)
+            callMethod(pref, "setKey", DEVICE_CONTROL_KEY)
+            // Resolve the CharSequence overload explicitly; the generic helper matches by
+            // parameter count only and would pick setTitle(int)/setSummary(int).
+            prefClass.getMethod("setTitle", CharSequence::class.java).invoke(pref, "\u8033\u673a\u63a7\u5236")
+            prefClass.getMethod("setSummary", CharSequence::class.java).invoke(pref, "\u6253\u5f00 HyperDrop \u8033\u673a\u63a7\u5236\u9875")
+            val target = Intent().apply {
+                setClassName(MODULE_PACKAGE, "cythen.hyperdrop.DeviceDetailActivity")
+                putExtra(BluetoothDevice.EXTRA_DEVICE, device)
+                putExtra("bluetoothaddress", device.address)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            callMethod(pref, "setIntent", target)
+            val parent = anchor?.parent ?: screen
+            val order = anchor?.pref?.let { runCatching { callMethod(it, "getOrder") as? Int }.getOrNull() }
+            if (order != null && order < Int.MAX_VALUE - 1) callMethod(pref, "setOrder", order + 1)
+            callMethod(parent, "addPreference", pref)
+            Log.d(TAG, "added headset-control preference for ${device.address}")
+        }.onFailure { Log.w(TAG, "failed to add headset-control preference", it) }
+    }
     /**
      * Re-apply the PUDDING artwork a few times because HyperOS can asynchronously replace
      * the product drawable after the Activity/Fragment is initially created.

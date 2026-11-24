@@ -301,30 +301,32 @@ class DeviceDetailActivity : ComponentActivity() {
 
     @SuppressLint("MissingPermission")
     private fun openNativeSystemHeadsetSettings(device: BluetoothDevice?) {
-        val address = device?.address ?: intent.getStringExtra("bluetoothaddress")
-        if (address.isNullOrBlank()) {
+        val resolved = device
+            ?: intent.getStringExtra("bluetoothaddress")
+                ?.let { runCatching { BluetoothAdapter.getDefaultAdapter()?.getRemoteDevice(it) }.getOrNull() }
+        if (resolved == null) {
             startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
             return
         }
 
-        val fragmentArgs = Bundle().apply { putString("device_address", address) }
+        // Xiaomi's ordinary Bluetooth device detail page, the same one used for non-headset
+        // devices. It reads a "device" BluetoothDevice Parcelable from its fragment arguments.
+        val fragmentArgs = Bundle().apply { putParcelable("device", resolved) }
         val direct = Intent().apply {
             setClassName("com.android.settings", "com.android.settings.SubSettings")
-            putExtra(":settings:show_fragment", "com.android.settings.bluetooth.BluetoothDeviceDetailsFragment")
+            putExtra(":settings:show_fragment", "com.android.settings.bluetooth.DeviceProfilesSettings")
             putExtra(":settings:show_fragment_args", fragmentArgs)
-            putExtra("device_address", address)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
 
-        // First try the normal Settings fragment entry directly. If this HyperOS build keeps
-        // SubSettings non-exported, wake Settings and ask our injected Settings-process bridge
-        // to perform the exact same launch from the system UID.
+        // A direct SubSettings launch from a third-party UID may be restricted on some builds;
+        // fall back to the Settings-process bridge, which launches the same page from system UID.
         runCatching { startActivity(direct) }.onFailure {
             runCatching { startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) }
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 sendBroadcast(Intent(SettingsHeadsetHook.ACTION_OPEN_BT_DEVICE_DETAILS).apply {
                     setPackage("com.android.settings")
-                    putExtra(SettingsHeadsetHook.EXTRA_DEVICE_ADDRESS, address)
+                    putExtra(SettingsHeadsetHook.EXTRA_DEVICE_ADDRESS, resolved.address)
                     addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
                 })
             }, 350L)

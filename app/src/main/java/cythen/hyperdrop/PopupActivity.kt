@@ -73,9 +73,7 @@ class PopupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Restore the original OppoPods/HyperOriG connection popup route.
-        // The popup itself stays intact. Its "更多" uses HyperOS' official headset entry;
-        // SettingsHeadsetHook then redirects that entry to DeviceDetailActivity.
+        // Keep the connection popup intact. Its "更多" opens HyperDrop's own device page.
         val prefs = getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
         val bluetoothDevice = resolveBluetoothDevice(intent)
 
@@ -89,7 +87,7 @@ class PopupActivity : ComponentActivity() {
                 PopupContent(
                     initialDeviceName = intent.getStringExtra("device_name").orEmpty(),
                     onMore = {
-                        openNativeHeadsetSettings(bluetoothDevice)
+                        openModuleDevicePage(bluetoothDevice)
                         finish()
                     },
                     onDone = { finish() }
@@ -100,28 +98,16 @@ class PopupActivity : ComponentActivity() {
 
 
     @android.annotation.SuppressLint("MissingPermission")
-    private fun openNativeHeadsetSettings(bluetoothDevice: BluetoothDevice?) {
-        if (bluetoothDevice == null) {
-            startActivity(Intent(this, DeviceDetailActivity::class.java).apply {
-                intent.getStringExtra("bluetoothaddress")?.let { putExtra("bluetoothaddress", it) }
-            })
-            return
+    private fun openModuleDevicePage(bluetoothDevice: BluetoothDevice?) {
+        val target = Intent(this, DeviceDetailActivity::class.java)
+        if (bluetoothDevice != null) {
+            target.putExtra(BluetoothDevice.EXTRA_DEVICE, bluetoothDevice)
+            target.putExtra("bluetoothaddress", bluetoothDevice.address)
+        } else {
+            intent.getStringExtra("bluetoothaddress")?.let { target.putExtra("bluetoothaddress", it) }
         }
-        val target = Intent().apply {
-            setClassName("com.android.settings", "com.android.settings.bluetooth.MiuiHeadsetActivity")
-            putExtra(BluetoothDevice.EXTRA_DEVICE, bluetoothDevice)
-            putExtra("bluetoothaddress", bluetoothDevice.address)
-            putExtra("MIUI_HEADSET_SUPPORT", ConfigManager.fakeSupport())
-            putExtra("COME_FROM", "MIUI_BLUETOOTH_SETTINGS")
-            putExtra("DEVICE_ID", ConfigManager.fakeDeviceId())
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        runCatching { startActivity(target) }.onFailure {
-            startActivity(Intent(this, DeviceDetailActivity::class.java).apply {
-                putExtra(BluetoothDevice.EXTRA_DEVICE, bluetoothDevice)
-                putExtra("bluetoothaddress", bluetoothDevice.address)
-            })
-        }
+        target.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        startActivity(target)
     }
 
     @android.annotation.SuppressLint("MissingPermission")
