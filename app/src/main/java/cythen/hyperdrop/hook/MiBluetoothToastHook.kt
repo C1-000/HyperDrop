@@ -124,6 +124,7 @@ object MiBluetoothToastHook : HookContext() {
                         putExtra("android.bluetooth.device.extra.DEVICE", bluetoothDevice)
                         putExtra("bluetoothaddress", bluetoothDevice.address)
                         putExtra("device_name", alias)
+                        addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_HISTORY)
                     },
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )

@@ -59,7 +59,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Months
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
@@ -154,7 +153,6 @@ internal fun MainTabsScaffold(
     onDismissRestartScopeDialog: () -> Unit,
     onRestartScopes: (List<String>) -> Unit,
     onBackToDevicePicker: () -> Unit,
-    onOpenSystemHeadsetSettings: () -> Unit,
     onSavePodImages: (String, String, Map<PodImageResource, Uri?>, Set<PodImageResource>) -> Unit,
     onOpenDeviceAdaptation: () -> Unit,
     onOpenDebug: () -> Unit,
@@ -294,7 +292,6 @@ internal fun MainTabsScaffold(
                         onDismissConnectError = onDismissConnectError,
                         onBackToDevicePicker = onBackToDevicePicker,
                         onOpenPodImageConfig = { showPodImageDialog = true },
-                        onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                     )
 
                     MainTab.Settings -> SettingsTabPage(
@@ -330,7 +327,6 @@ internal fun MainTabsScaffold(
                     onBackToDevicePicker = onBackToDevicePicker,
                     onOpenPodImageConfig = { showPodImageDialog = true },
                     onRefreshStatus = onRefreshStatus,
-                    onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                 )
             }
         }
@@ -479,7 +475,6 @@ private fun EarphonesTabShell(
     onDismissConnectError: () -> Unit,
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
-    onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
     Scaffold(
@@ -501,7 +496,6 @@ private fun EarphonesTabShell(
                             EarphoneDetailActions(
                                 onOpenPodImageConfig = onOpenPodImageConfig,
                                 onRefreshStatus = onRefreshStatus,
-                                onOpenSystemHeadsetSettings = onOpenSystemHeadsetSettings,
                             )
                         }
                     },
@@ -640,7 +634,6 @@ private fun LandscapeDetailActions(
     onBackToDevicePicker: () -> Unit,
     onOpenPodImageConfig: () -> Unit,
     onRefreshStatus: () -> Unit,
-    onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     IconButton(
         modifier = Modifier
@@ -675,18 +668,6 @@ private fun LandscapeDetailActions(
                 contentDescription = stringResource(R.string.custom_pod_images),
             )
         }
-        IconButton(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 8.dp)
-                .zIndex(1f),
-            onClick = onOpenSystemHeadsetSettings,
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Settings,
-                contentDescription = stringResource(R.string.click_action_system_settings),
-            )
-        }
     }
 }
 
@@ -694,7 +675,6 @@ private fun LandscapeDetailActions(
 private fun EarphoneDetailActions(
     onOpenPodImageConfig: () -> Unit,
     onRefreshStatus: () -> Unit,
-    onOpenSystemHeadsetSettings: () -> Unit,
 ) {
     IconButton(onClick = onRefreshStatus) {
         Icon(
@@ -707,12 +687,6 @@ private fun EarphoneDetailActions(
             imageVector = MiuixIcons.Edit,
             modifier = Modifier.size(23.dp),
             contentDescription = stringResource(R.string.custom_pod_images),
-        )
-    }
-    IconButton(onClick = onOpenSystemHeadsetSettings) {
-        Icon(
-            imageVector = MiuixIcons.Settings,
-            contentDescription = stringResource(R.string.click_action_system_settings),
         )
     }
 }

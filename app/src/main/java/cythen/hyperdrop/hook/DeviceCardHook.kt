@@ -74,14 +74,10 @@ object DeviceCardHook : HookContext() {
             while (mac.isEmpty() && waitCnt-- > 0) Thread.sleep(50)
 
             if (mac.equals(id, ignoreCase = true)) {
-                // Keep the native HyperOS detail page as the first destination, same route
-                // as the focus island. SettingsHeadsetHook supplies the virtual headset data.
-                val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
-                val device = runCatching { adapter?.getRemoteDevice(id) }.getOrNull()
+                // Open HyperDrop's own earphones page, same route as the focus island popup.
                 Intent().apply {
-                    setClassName(BuildConfig.APPLICATION_ID, "cythen.hyperdrop.DeviceDetailActivity")
-                    device?.let { putExtra("android.bluetooth.device.extra.DEVICE", it) }
-                    putExtra("bluetoothaddress", id)
+                    setClassName(BuildConfig.APPLICATION_ID, "cythen.hyperdrop.MainActivity")
+                    putExtra("open_detail", true)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     context.startActivity(this)
                 }

@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
             val prefs = remember { getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE) }
             val themeMode = remember { mutableStateOf(prefs.getInt("theme_mode", 0)) }
             val accentMode = remember { mutableStateOf(prefs.getInt("accent_mode", 0)) }
-            val floatingBottomBar = remember { mutableStateOf(prefs.getBoolean("floating_bottom_bar", true)) }
+            val floatingBottomBar = remember { mutableStateOf(prefs.getBoolean("floating_bottom_bar", false)) }
             val appLanguage = remember { mutableStateOf(prefs.getInt("app_language", AppLocale.DEFAULT)) }
             val systemDark = isSystemInDarkTheme()
             val darkMode = when (themeMode.value) {

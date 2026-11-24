@@ -37,15 +37,11 @@
                 <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
             </intent-filter>
         </activity>
-        <activity android:name=".DeviceDetailActivity"
-            android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|mnc|colorMode|density|fontScale|fontWeightAdjustment|keyboard|layoutDirection|locale|mcc|navigation|smallestScreenSize|touchscreen|uiMode"
-            android:exported="true" />
-
         <activity android:name=".PopupActivity"
             android:theme="@style/Theme.OppoPods.Popup"
             android:taskAffinity=""
             android:excludeFromRecents="true"
+            android:noHistory="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="cythen.hyperdrop.action.show_pods_ui" />

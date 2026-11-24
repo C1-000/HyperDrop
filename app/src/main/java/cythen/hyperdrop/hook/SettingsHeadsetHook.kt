@@ -859,7 +859,7 @@ object SettingsHeadsetHook : HookContext() {
     /**
      * Xiaomi's ordinary Bluetooth detail page (DeviceProfilesSettings) is the page MOONDROP
      * headsets land on when the Xiaomi headset page is bypassed. Add one preference that
-     * opens HyperDrop's own DeviceDetailActivity with the device attached.
+     * opens HyperDrop's own earphones page for the connected device.
      */
     private fun hookDeviceProfilesSettings() {
         runCatching {
@@ -922,9 +922,8 @@ object SettingsHeadsetHook : HookContext() {
             prefClass.getMethod("setTitle", CharSequence::class.java).invoke(pref, "\u8033\u673a\u63a7\u5236")
             prefClass.getMethod("setSummary", CharSequence::class.java).invoke(pref, "\u6253\u5f00 HyperDrop \u8033\u673a\u63a7\u5236\u9875")
             val target = Intent().apply {
-                setClassName(MODULE_PACKAGE, "cythen.hyperdrop.DeviceDetailActivity")
-                putExtra(BluetoothDevice.EXTRA_DEVICE, device)
-                putExtra("bluetoothaddress", device.address)
+                setClassName(MODULE_PACKAGE, "cythen.hyperdrop.MainActivity")
+                putExtra("open_detail", true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
             callMethod(pref, "setIntent", target)

@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import cythen.hyperdrop.R
+import cythen.hyperdrop.config.DeviceImageCatalog
 import cythen.hyperdrop.device.DeviceRegistry
 import cythen.hyperdrop.device.SimulatedDevice
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -175,6 +179,7 @@ fun DevicePickerPage(
                     DeviceRow(
                         title = device.displayName,
                         summary = "${device.address} · ${stringResource(R.string.virtual_device_badge)}",
+                        imageKey = DeviceRegistry.profileById(device.profileId).imageKey,
                         connected = connected,
                         connecting = connectingDeviceAddress != null &&
                             device.address.equals(connectingDeviceAddress, ignoreCase = true),
@@ -229,6 +234,7 @@ fun DevicePickerPage(
                     DeviceRow(
                         title = device.name ?: stringResource(R.string.unknown_device),
                         summary = device.address,
+                        imageKey = DeviceRegistry.profileFor(device.name).imageKey,
                         connected = connected,
                         connecting = device.address == connectingDeviceAddress,
                         onClick = { if (connected) onConnectedDeviceClick() else onDeviceSelected(device) },
@@ -298,6 +304,7 @@ fun DevicePickerPage(
 private fun DeviceRow(
     title: String,
     summary: String,
+    imageKey: String? = null,
     connected: Boolean,
     connecting: Boolean,
     onClick: () -> Unit,
@@ -314,6 +321,15 @@ private fun DeviceRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Image(
+                painter = painterResource(DeviceImageCatalog.resolve(imageKey).box),
+                contentDescription = title,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Fit,
+            )
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,

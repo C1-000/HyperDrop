@@ -1,7 +1,5 @@
 package cythen.hyperdrop
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -73,10 +71,21 @@ class PopupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep the connection popup intact. Its "更多" opens HyperDrop's own device page.
-        val prefs = getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
-        val bluetoothDevice = resolveBluetoothDevice(intent)
+        // Behave like a lightweight overlay: a transparent floating window that does not
+        // steal focus, dims nothing, and lets touches outside fall through to the app behind.
+        window.apply {
+            addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            )
+            setDimAmount(0f)
+        }
+        overridePendingTransition(0, 0)
 
+        // A tap outside the floating window dismisses the popup instead of leaving it up.
+        // Keep the connection popup intact. Its "更多" opens HyperDrop's own earphones page.
+        val prefs = getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
         setContent {
             val colorSchemeMode = when (prefs.getInt("theme_mode", 0)) {
                 1 -> ColorSchemeMode.Light
@@ -87,7 +96,7 @@ class PopupActivity : ComponentActivity() {
                 PopupContent(
                     initialDeviceName = intent.getStringExtra("device_name").orEmpty(),
                     onMore = {
-                        openModuleDevicePage(bluetoothDevice)
+                        openModuleDevicePage()
                         finish()
                     },
                     onDone = { finish() }
@@ -97,33 +106,21 @@ class PopupActivity : ComponentActivity() {
     }
 
 
-    @android.annotation.SuppressLint("MissingPermission")
-    private fun openModuleDevicePage(bluetoothDevice: BluetoothDevice?) {
-        val target = Intent(this, DeviceDetailActivity::class.java)
-        if (bluetoothDevice != null) {
-            target.putExtra(BluetoothDevice.EXTRA_DEVICE, bluetoothDevice)
-            target.putExtra("bluetoothaddress", bluetoothDevice.address)
-        } else {
-            intent.getStringExtra("bluetoothaddress")?.let { target.putExtra("bluetoothaddress", it) }
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+            finish()
+            return true
         }
-        target.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun openModuleDevicePage() {
+        val target = Intent(this, MainActivity::class.java).apply {
+            putExtra("open_detail", true)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
         startActivity(target)
     }
-
-    @android.annotation.SuppressLint("MissingPermission")
-    private fun resolveBluetoothDevice(source: Intent): BluetoothDevice? {
-        source.parcelableDevice(BluetoothDevice.EXTRA_DEVICE)?.let { return it }
-        val address = source.getStringExtra("bluetoothaddress") ?: return null
-        return runCatching { BluetoothAdapter.getDefaultAdapter()?.getRemoteDevice(address) }.getOrNull()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun Intent.parcelableDevice(key: String): BluetoothDevice? =
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            getParcelableExtra(key, BluetoothDevice::class.java)
-        } else {
-            getParcelableExtra(key)
-        }
 }
 
 @Composable

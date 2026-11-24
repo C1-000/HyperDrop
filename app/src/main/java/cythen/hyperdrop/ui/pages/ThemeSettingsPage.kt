@@ -22,7 +22,7 @@ fun ThemeSettingsPage(
     onThemeModeChange: (Int) -> Unit = {},
     accentMode: MutableState<Int> = mutableStateOf(0),
     onAccentModeChange: (Int) -> Unit = {},
-    floatingBottomBar: MutableState<Boolean> = mutableStateOf(true),
+    floatingBottomBar: MutableState<Boolean> = mutableStateOf(false),
     onFloatingBottomBarChange: (Boolean) -> Unit = {},
 ) {
     val themeOptions = listOf(

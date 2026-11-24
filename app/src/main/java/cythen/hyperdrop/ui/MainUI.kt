@@ -100,7 +100,7 @@ fun MainUI(
     onThemeModeChange: (Int) -> Unit = {},
     accentMode: MutableState<Int> = mutableStateOf(0),
     onAccentModeChange: (Int) -> Unit = {},
-    floatingBottomBar: MutableState<Boolean> = mutableStateOf(true),
+    floatingBottomBar: MutableState<Boolean> = mutableStateOf(false),
     onFloatingBottomBarChange: (Boolean) -> Unit = {},
     appLanguage: MutableState<Int> = mutableStateOf(AppLocale.DEFAULT),
     onAppLanguageChange: (Int) -> Unit = {},
@@ -138,7 +138,7 @@ fun MainUI(
     val ldacEnabled = remember { mutableStateOf(false) }
     val dualConnectionEnabled = remember { mutableStateOf(false) }
     val tabs = remember { MainTab.entries.toList() }
-    var selectedTab by remember { mutableStateOf(if (openSettings) MainTab.Settings else if (openDetail) MainTab.Earphones else MainTab.Module) }
+    var selectedTab by remember { mutableStateOf(if (openSettings) MainTab.Settings else MainTab.Earphones) }
     var hasAppliedDefaultTab by remember { mutableStateOf(openDetail || openSettings) }
     var bluetoothState by remember { mutableStateOf(readBluetoothState(context)) }
     var xposedService by remember { mutableStateOf(OppoPodsApp.xposedService) }
@@ -274,7 +274,7 @@ fun MainUI(
 
     LaunchedEffect(canShowDetailPage) {
         if (!hasAppliedDefaultTab) {
-            selectedTab = if (canShowDetailPage) MainTab.Earphones else MainTab.Module
+            selectedTab = MainTab.Earphones
             hasAppliedDefaultTab = true
         }
     }
@@ -765,12 +765,6 @@ fun MainUI(
         selectedTab = MainTab.Earphones
     }
 
-    fun openSystemHeadsetSettings() {
-        // HyperOriG route: never enter the spoofed OPPO MiuiHeadsetActivity.
-        // The settings icon stays inside HyperDrop and opens the module Settings tab.
-        selectedTab = MainTab.Settings
-    }
-
     fun refreshStatus() {
         if (hookConnected.value) {
             dispatchPodIntent(OppoPodsAction.ACTION_REFRESH_STATUS)
@@ -944,7 +938,6 @@ fun MainUI(
                 onDismissRestartScopeDialog = { showRestartScopeDialog = false },
                 onRestartScopes = { restartScopes(it) },
                 onBackToDevicePicker = { backToDevicePicker() },
-                onOpenSystemHeadsetSettings = { openSystemHeadsetSettings() },
                 onSavePodImages = { address, name, images, clearedImages ->
                     savePodImages(address, name, images, clearedImages)
                 },
@@ -1138,7 +1131,9 @@ fun MainUI(
     NavDisplay(
         entries = entries,
         onBack = {
-            if (backStack.size > 1) {
+            if (backStack.lastOrNull() == Screen.Main && selectedTab == MainTab.Earphones && showEarphoneDetail) {
+                backToDevicePicker()
+            } else if (backStack.size > 1) {
                 backStack.removeLast()
             } else {
                 (context as? Activity)?.finish()
