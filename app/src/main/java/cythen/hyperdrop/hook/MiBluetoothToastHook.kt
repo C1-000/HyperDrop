@@ -219,6 +219,10 @@ object MiBluetoothToastHook : HookContext() {
                         .setDefaults(-1)
                         .setContentTitle(alias)
                         .setContentText(contentText)
+                        // Keep this persistent headset card alive across manual swipes:
+                        // the delete broadcast has no listener, so a cleared card would
+                        // never be republished until the next GAIA battery packet.
+                        .setOngoing(true)
                         .setContentIntent(pendingIntent)
                         .setDeleteIntent(deleteIntent(context, bluetoothDevice))
                         .setColor(context.getColor(system_notification_accent_color))

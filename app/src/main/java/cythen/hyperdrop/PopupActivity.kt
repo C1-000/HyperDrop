@@ -87,6 +87,7 @@ class PopupActivity : ComponentActivity() {
             }
             AppTheme(colorSchemeMode = colorSchemeMode, accentMode = prefs.getInt("accent_mode", 0)) {
                 PopupContent(
+                    initialDeviceName = intent.getStringExtra("device_name").orEmpty(),
                     onMore = {
                         openNativeHeadsetSettings(bluetoothDevice)
                         finish()
@@ -140,7 +141,7 @@ class PopupActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
+private fun PopupContent(initialDeviceName: String, onMore: () -> Unit, onDone: () -> Unit) {
     val context = LocalContext.current
     val showDialog = remember { mutableStateOf(true) }
 
@@ -156,7 +157,7 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
     val batteryParams = remember { mutableStateOf(BatteryParams()) }
     val ancMode = remember { mutableStateOf(NoiseControlMode.OFF) }
     val transparencyVocalEnhancement = remember { mutableStateOf(false) }
-    val deviceName = remember { mutableStateOf("") }
+    val deviceName = remember { mutableStateOf(initialDeviceName) }
     // True while the official MOONDROP app owns the control channel and this module has
     // released it, so the popup can show that state instead of pretending to be live.
     val controlsYielded = remember { mutableStateOf(false) }
@@ -180,7 +181,9 @@ private fun PopupContent(onMore: () -> Unit, onDone: () -> Unit) {
                             p1.getParcelableExtra("status", BatteryParams::class.java)!!
                     }
                     OppoPodsAction.ACTION_PODS_CONNECTED -> {
-                        deviceName.value = p1.getStringExtra("device_name") ?: ""
+                        p1.getStringExtra("device_name")?.takeIf { it.isNotBlank() }?.let {
+                            deviceName.value = it
+                        }
                         if (!showDialog.value) showDialog.value = true
                     }
                     OppoPodsAction.ACTION_PODS_DISCONNECTED -> {

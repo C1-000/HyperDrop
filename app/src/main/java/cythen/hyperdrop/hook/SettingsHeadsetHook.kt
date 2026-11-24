@@ -39,7 +39,6 @@ object SettingsHeadsetHook : HookContext() {
     private val knownOppoAddresses = linkedSetOf<String>()
     private val batteryViews = WeakHashMap<Any, BluetoothDevice>()
     private val headsetFragments = WeakHashMap<Any, Boolean>()
-    private val redirectedNativeActivities = WeakHashMap<Activity, Boolean>()
     private var context: Context? = null
     private var receiverRegistered = false
     private var controlYielded = false
@@ -149,26 +148,6 @@ object SettingsHeadsetHook : HookContext() {
             }
         }.onFailure { Log.w(TAG, "hook MiuiHeadsetActivity product image skipped", it) }
 
-        // Keep HyperOS' official headset ENTRY, but replace the page it lands on with the
-        // standalone PUDDING detail screen. Focus Island is independent and still opens
-        // PopupActivity; only MiuiHeadsetActivity is redirected here.
-        runCatching {
-            hookAfter(findMethod("com.android.settings.bluetooth.MiuiHeadsetActivity", "onCreate", Bundle::class.java)) {
-                val activity = instance as? Activity ?: return@hookAfter
-                if (activity.isFinishing || redirectedNativeActivities.containsKey(activity)) return@hookAfter
-                val device = activity.intent.parcelableDevice("android.bluetooth.device.extra.DEVICE")
-                val address = runCatching { device?.address }.getOrNull()
-                    ?: activity.intent.getStringExtra("bluetoothaddress")
-                    ?: currentAddress
-                val looksLikePudding = isOppoPod(device)
-                    || (!address.isNullOrBlank() && isOppoAddress(address))
-                    || activity.intent.getStringExtra("DEVICE_ID") == fakeDeviceId()
-                    || activity.intent.getStringExtra("MIUI_HEADSET_SUPPORT")?.startsWith(fakeDeviceId()) == true
-                if (!looksLikePudding) return@hookAfter
-                redirectOfficialHeadsetPage(activity, device, address)
-            }
-        }.onFailure { Log.w(TAG, "hook MiuiHeadsetActivity redirect skipped", it) }
-
         runCatching {
             hookBefore(findMethod("com.android.settings.bluetooth.MiuiHeadsetActivityPlugin", "onCreate", Bundle::class.java)) {
                 val activity = instance as? Context ?: return@hookBefore
@@ -182,29 +161,6 @@ object SettingsHeadsetHook : HookContext() {
                 Log.d(TAG, "MiuiHeadsetActivityPlugin intent patched address=${device?.address}")
             }
         }.onFailure { Log.w(TAG, "hook MiuiHeadsetActivityPlugin skipped", it) }
-    }
-
-    private fun redirectOfficialHeadsetPage(
-        activity: Activity,
-        device: BluetoothDevice?,
-        address: String?,
-    ) {
-        redirectedNativeActivities[activity] = true
-        val target = Intent().apply {
-            setClassName(MODULE_PACKAGE, "cythen.hyperdrop.DeviceDetailActivity")
-            device?.let { putExtra(BluetoothDevice.EXTRA_DEVICE, it) }
-            if (!address.isNullOrBlank()) putExtra("bluetoothaddress", address)
-            putExtra("from_hyperos_headset_entry", true)
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        runCatching {
-            activity.startActivity(target)
-            Log.d(TAG, "official MiuiHeadsetActivity -> DeviceDetailActivity address=$address")
-            activity.finish()
-        }.onFailure { error ->
-            redirectedNativeActivities.remove(activity)
-            Log.e(TAG, "redirect official headset page failed", error)
-        }
     }
 
     private fun hookActivityStringGetter(methodName: String, value: () -> String) {
