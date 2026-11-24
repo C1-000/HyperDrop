@@ -150,10 +150,7 @@ object FocusIslandUtil {
                     // Seed the popup title/capabilities; it no longer depends on a race-prone broadcast.
                     putExtra("device_name", earphone?.name.orEmpty())
                     setIdentifier("HyperDropFocus:$address")
-                    addFlags(
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_HISTORY
-                    )
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 },
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )

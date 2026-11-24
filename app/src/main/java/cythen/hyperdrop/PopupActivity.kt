@@ -71,19 +71,6 @@ class PopupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Behave like a lightweight overlay: a transparent floating window that does not
-        // steal focus, dims nothing, and lets touches outside fall through to the app behind.
-        window.apply {
-            addFlags(
-                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-            )
-            setDimAmount(0f)
-        }
-        overridePendingTransition(0, 0)
-
-        // A tap outside the floating window dismisses the popup instead of leaving it up.
         // Keep the connection popup intact. Its "更多" opens HyperDrop's own earphones page.
         val prefs = getSharedPreferences(ConfigManager.PREFS_NAME, Context.MODE_PRIVATE)
         setContent {
@@ -103,15 +90,6 @@ class PopupActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-
-    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-        if (ev.action == android.view.MotionEvent.ACTION_OUTSIDE) {
-            finish()
-            return true
-        }
-        return super.dispatchTouchEvent(ev)
     }
 
     private fun openModuleDevicePage() {

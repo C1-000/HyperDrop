@@ -36,6 +36,14 @@ object MiBluetoothToastHook : HookContext() {
 
     override fun onHook() {
 
+        // HyperOS can still let the user clear an ongoing notification. Cache the most
+        // recent payload per address so a swipe can be undone while the headset stays
+        // connected (see the delete-intent branch of bridgeReceiver below).
+        val notificationCache = HashMap<String, Pair<BluetoothDevice, BatteryParams>>()
+        val activeAddresses = HashSet<String>()
+        val restoreHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        val restoreRunnables = HashMap<String, Runnable>()
+
         fun deleteIntent(context: Context, bluetoothDevice: BluetoothDevice): PendingIntent? {
             val intent = Intent("com.android.bluetooth.headset.notification.cancle")
             intent.putExtra("android.bluetooth.device.extra.DEVICE", bluetoothDevice)
@@ -55,6 +63,9 @@ object MiBluetoothToastHook : HookContext() {
             }
             try {
                 val address: String = bluetoothDevice.address
+                activeAddresses.add(address)
+                notificationCache[address] = bluetoothDevice to batteryParams
+                restoreRunnables.remove(address)?.let { restoreHandler.removeCallbacks(it) }
                 var alias: String? = bluetoothDevice.alias
                 if (alias?.isEmpty() == true) {
                     alias = bluetoothDevice.name
@@ -124,7 +135,6 @@ object MiBluetoothToastHook : HookContext() {
                         putExtra("android.bluetooth.device.extra.DEVICE", bluetoothDevice)
                         putExtra("bluetoothaddress", bluetoothDevice.address)
                         putExtra("device_name", alias)
-                        addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or Intent.FLAG_ACTIVITY_NO_HISTORY)
                     },
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
@@ -241,6 +251,9 @@ object MiBluetoothToastHook : HookContext() {
         fun cancelNotification(bluetoothDevice: BluetoothDevice, context: Context) {
             try {
                 val address = bluetoothDevice.address
+                activeAddresses.remove(address)
+                notificationCache.remove(address)
+                restoreRunnables.remove(address)?.let { restoreHandler.removeCallbacks(it) }
                 if (address.isNotEmpty()) {
                     val notificationManager = context.getSystemService("notification") as NotificationManager
                     notificationManager.cancelAsUser("BTHeadset$address", 10003, SystemApisUtils.getUserAllUserHandle())
@@ -272,6 +285,24 @@ object MiBluetoothToastHook : HookContext() {
                         val address = p1.getStringExtra("address").orEmpty()
                         val shown = FocusIslandUtil.showBatteryIsland(receiverCtx, prefs, batteryParams, address)
                         android.util.Log.d("HyperDrop-Island", "Focus request handled shown=$shown address=$address")
+                    }
+                    "com.android.bluetooth.headset.notification.cancle" -> {
+                        val device = p1.getParcelableExtra(
+                            "android.bluetooth.device.extra.DEVICE", BluetoothDevice::class.java
+                        ) ?: return
+                        val address = device.address
+                        if (!activeAddresses.contains(address)) return
+                        restoreRunnables.remove(address)?.let { restoreHandler.removeCallbacks(it) }
+                        val restore = Runnable {
+                            restoreRunnables.remove(address)
+                            if (!activeAddresses.contains(address)) return@Runnable
+                            val cached = notificationCache[address] ?: return@Runnable
+                            val ctx = bridgeContext ?: return@Runnable
+                            Log.d("HyperDrop", "restore notification after swipe address=$address")
+                            createPodsNotification(cached.first, ctx, cached.second)
+                        }
+                        restoreRunnables[address] = restore
+                        restoreHandler.postDelayed(restore, 10_000L)
                     }
                     "cythen.hyperdrop.action.updatepodsnotification" -> {
                         val batteryParams = p1.getParcelableExtra("batteryParams", BatteryParams::class.java)
@@ -322,6 +353,7 @@ object MiBluetoothToastHook : HookContext() {
                 addAction("cythen.hyperdrop.action.sendstrongtoast")
                 addAction("cythen.hyperdrop.action.updatepodsnotification")
                 addAction("cythen.hyperdrop.action.cancelpodsnotification")
+                addAction("com.android.bluetooth.headset.notification.cancle")
                 addAction(OppoPodsAction.ACTION_CYCLE_ANC)
                 addAction(OppoPodsAction.ACTION_PODS_ANC_CHANGED)
             }
