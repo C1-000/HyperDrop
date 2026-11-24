@@ -128,14 +128,24 @@ object MiBluetoothToastHook : HookContext() {
                     },
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
+                // AOD text must be part of the template from build time, not injected
+                // into the serialized JSON afterwards (that round-trip is fragile).
+                val aodParts = mutableListOf<String>()
+                if (batteryParams.left?.isConnected == true && (batteryParams.left?.battery ?: 0) > 0)
+                    aodParts.add("L ${batteryParams.left!!.battery}%")
+                if (batteryParams.right?.isConnected == true && (batteryParams.right?.battery ?: 0) > 0)
+                    aodParts.add("R ${batteryParams.right!!.battery}%")
+                val aodText = aodParts.joinToString(" | ")
                 val focusExtras = FocusNotification.buildV3 {
                     val logo = createPicture("key_headset", headsetIcon)
                     // AOD/island must stay attached to this persistent notification.
-                    // A separate short-lived island notification used to cancel the
-                    // HyperOS focus session and wipe AOD after 4s.
-                    enableFloat = false
+                    // enableFloat=true re-expands the island on each battery update;
+                    // dismissIsland/islandTimeout below still collapse it after 5s.
+                    enableFloat = true
                     ticker = alias ?: ""
                     updatable = true
+                    // AOD text lives on the template base so it survives the focus session.
+                    if (aodText.isNotBlank()) aodTitle = aodText
 //                    tickerPic = logo
 
                     iconTextInfo {
@@ -161,12 +171,15 @@ object MiBluetoothToastHook : HookContext() {
                                     type = 1
                                     pic = logo
                                 }
+                                textInfo {
+                                    title = alias ?: ""
+                                }
                             }
                             imageTextInfoRight {
                                 type = 2
                                 textInfo {
-                                    title = alias ?: ""
-                                    content = contentText
+                                    // The island right column only renders title, not content.
+                                    title = contentText
                                 }
                             }
                         }
@@ -174,16 +187,24 @@ object MiBluetoothToastHook : HookContext() {
 
 
                     // Single circular Close button on the right side of the card.
-                    // Miuix Close.Regular is rasterized from the local vector because
-                    // this notification is built inside com.xiaomi.bluetooth (no Compose).
-                    val closeSize = (24f * moduleContext.resources.displayMetrics.density).toInt()
+                    // Miuix Close.Regular is rasterized from a local vector because this
+                    // notification is built inside com.xiaomi.bluetooth (no Compose here).
+                    // Bake the dark circle into the bitmap as well as setting actionBgColor:
+                    // some HyperOS builds ignore the JSON color field for type=0 actions.
+                    val closeSize = (20f * moduleContext.resources.displayMetrics.density).toInt()
                         .coerceAtLeast(1)
                     val closeDrawable = moduleContext.getDrawable(R.drawable.ic_miuix_close)?.mutate()
                     val closeKey = if (closeDrawable != null) {
                         val closeBitmap = Bitmap.createBitmap(closeSize, closeSize, Bitmap.Config.ARGB_8888)
+                        val closeCanvas = Canvas(closeBitmap)
+                        val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = 0x66000000
+                        }
+                        closeCanvas.drawCircle(closeSize / 2f, closeSize / 2f, closeSize / 2f, bgPaint)
+                        val inset = (closeSize * 0.28f).toInt()
                         closeDrawable.setTint(android.graphics.Color.WHITE)
-                        closeDrawable.setBounds(0, 0, closeSize, closeSize)
-                        closeDrawable.draw(Canvas(closeBitmap))
+                        closeDrawable.setBounds(inset, inset, closeSize - inset, closeSize - inset)
+                        closeDrawable.draw(closeCanvas)
                         createPicture("key_close", Icon.createWithBitmap(closeBitmap))
                     } else null
                     val disconnectParcel = Notification.Action.Builder(
@@ -194,6 +215,8 @@ object MiBluetoothToastHook : HookContext() {
                     actions {
                         addActionInfo {
                             type = 0
+                            actionBgColor = "#66000000"
+                            actionBgColorDark = "#66000000"
                             if (closeKey != null) {
                                 actionIcon = closeKey
                                 actionIconDark = closeKey
@@ -202,23 +225,7 @@ object MiBluetoothToastHook : HookContext() {
                         }
                     }
                 }
-                // AOD 息屏显示：左右耳电量拼合后注入 aodTitle
-                if (focusExtras != null) {
-                    val aodParts = mutableListOf<String>()
-                    if (batteryParams.left?.isConnected == true)
-                        aodParts.add("L ${batteryParams.left!!.battery}%")
-                    if (batteryParams.right?.isConnected == true)
-                        aodParts.add("R ${batteryParams.right!!.battery}%")
-                    val aodTitle = aodParts.joinToString(" | ")
-                    try {
-                        val json = org.json.JSONObject(focusExtras.getString("miui.focus.param") ?: "{}")
-                        val pv2 = json.optJSONObject("param_v2") ?: org.json.JSONObject()
-                        pv2.put("aodTitle", aodTitle)
-                        pv2.put("aodPic", "key_headset")
-                        json.put("param_v2", pv2)
-                        focusExtras.putString("miui.focus.param", json.toString())
-                    } catch (_: Exception) {}
-                }
+                Log.d("HyperDrop", "focus param: ${focusExtras?.getString("miui.focus.param")}")
                 notificationManager.notifyAsUser(
                     "BTHeadset$address",
                     10003,
