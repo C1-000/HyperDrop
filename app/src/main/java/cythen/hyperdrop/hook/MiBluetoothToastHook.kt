@@ -11,11 +11,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import com.xzakota.hyper.notification.focus.FocusNotification
-import cythen.hyperdrop.utils.FocusIslandUtil
 import cythen.hyperdrop.utils.PodImageLoader
 import cythen.hyperdrop.utils.SystemApisUtils
 import cythen.hyperdrop.utils.SystemApisUtils.cancelAsUser
@@ -55,7 +56,6 @@ object MiBluetoothToastHook : HookContext() {
             val miheadset_notification_Box = context.resources.getIdentifier("miheadset_notification_Box", "string", "com.xiaomi.bluetooth")
             val miheadset_notification_LeftEar = context.resources.getIdentifier("miheadset_notification_LeftEar", "string", "com.xiaomi.bluetooth")
             val miheadset_notification_RightEar = context.resources.getIdentifier("miheadset_notification_RightEar", "string", "com.xiaomi.bluetooth")
-            val miheadset_notification_Disconnect = context.resources.getIdentifier("miheadset_notification_Disconnect", "string", "com.xiaomi.bluetooth")
             val system_notification_accent_color = context.resources.getIdentifier("system_notification_accent_color", "color", "android")
             if (bluetoothDevice == null) {
                 Log.e("HyperDrop", "createPodsNotification: btDevice null")
@@ -103,16 +103,6 @@ object MiBluetoothToastHook : HookContext() {
                 intent.putExtra("btData", bundle)
                 intent.putExtra("disconnect", "1")
                 intent.setIdentifier("BTHeadset$address")
-                val disconnectAction = Notification.Action(
-                    285737079,
-                    context.resources.getString(miheadset_notification_Disconnect),
-                    PendingIntent.getBroadcast(context, 0, intent, 201326592)
-                )
-                // 循环切换降噪模式，指定 package 确保广播路由到 com.android.bluetooth 进程
-                val ancCycleIntent = Intent(OppoPodsAction.ACTION_CYCLE_ANC)
-                ancCycleIntent.setPackage("com.android.bluetooth")
-                ancCycleIntent.setIdentifier("BTHeadset$address")
-                ancCycleIntent.putExtra("device_name", alias ?: bluetoothDevice.name ?: "")
                 val moduleContext = context.createPackageContext(
                     BuildConfig.APPLICATION_ID, Context.CONTEXT_IGNORE_SECURITY
                 )
@@ -140,7 +130,10 @@ object MiBluetoothToastHook : HookContext() {
                 )
                 val focusExtras = FocusNotification.buildV3 {
                     val logo = createPicture("key_headset", headsetIcon)
-                    enableFloat = true
+                    // AOD/island must stay attached to this persistent notification.
+                    // A separate short-lived island notification used to cancel the
+                    // HyperOS focus session and wipe AOD after 4s.
+                    enableFloat = false
                     ticker = alias ?: ""
                     updatable = true
 //                    tickerPic = logo
@@ -156,6 +149,11 @@ object MiBluetoothToastHook : HookContext() {
 
                     island {
                         islandProperty = 1
+                        // Only bigIslandArea here; no smallIslandArea (avoids a permanent
+                        // summary capsule). Island collapses after a few seconds while
+                        // the AOD text on this persistent card remains.
+                        dismissIsland = true
+                        islandTimeout = 5
                         bigIslandArea {
                             imageTextInfoLeft {
                                 type = 1
@@ -175,31 +173,32 @@ object MiBluetoothToastHook : HookContext() {
                     }
 
 
-                    textButton {
+                    // Single circular Close button on the right side of the card.
+                    // Miuix Close.Regular is rasterized from the local vector because
+                    // this notification is built inside com.xiaomi.bluetooth (no Compose).
+                    val closeSize = (24f * moduleContext.resources.displayMetrics.density).toInt()
+                        .coerceAtLeast(1)
+                    val closeDrawable = moduleContext.getDrawable(R.drawable.ic_miuix_close)?.mutate()
+                    val closeKey = if (closeDrawable != null) {
+                        val closeBitmap = Bitmap.createBitmap(closeSize, closeSize, Bitmap.Config.ARGB_8888)
+                        closeDrawable.setTint(android.graphics.Color.WHITE)
+                        closeDrawable.setBounds(0, 0, closeSize, closeSize)
+                        closeDrawable.draw(Canvas(closeBitmap))
+                        createPicture("key_close", Icon.createWithBitmap(closeBitmap))
+                    } else null
+                    val disconnectParcel = Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_delete),
+                        moduleContext.getString(R.string.notification_btn_disconnect),
+                        PendingIntent.getBroadcast(context, 2, intent, 201326592)
+                    ).build()
+                    actions {
                         addActionInfo {
-                            val ancLabel = moduleContext.getString(R.string.cycle_anc)
-                            val ancAction = Notification.Action.Builder(
-                                Icon.createWithResource(context, android.R.drawable.ic_lock_silent_mode),
-                                ancLabel,
-                                PendingIntent.getBroadcast(context, 1, ancCycleIntent, 201326592)
-                            ).build()
-                            action = createAction("key_anc_cycle", ancAction)
-                            actionTitle = ancLabel
-                        }
-                        addActionInfo {
-                            val disconnectLabel = moduleContext.getString(R.string.notification_btn_disconnect)
-                            val disconnectIntent = Intent("com.android.bluetooth.headset.notification").apply {
-                                putExtra("btData", bundle)
-                                putExtra("disconnect", "1")
-                                setIdentifier("BTHeadset$address")
+                            type = 0
+                            if (closeKey != null) {
+                                actionIcon = closeKey
+                                actionIconDark = closeKey
                             }
-                            val disconnectAction = Notification.Action.Builder(
-                                Icon.createWithResource(context, android.R.drawable.ic_delete),
-                                disconnectLabel,
-                                PendingIntent.getBroadcast(context, 2, disconnectIntent, 201326592)
-                            ).build()
-                            action = createAction("key_disconnect", disconnectAction)
-                            actionTitle = disconnectLabel
+                            action = createAction("key_disconnect", disconnectParcel)
                         }
                     }
                 }
@@ -237,7 +236,6 @@ object MiBluetoothToastHook : HookContext() {
                         .setContentIntent(pendingIntent)
                         .setDeleteIntent(deleteIntent(context, bluetoothDevice))
                         .setColor(context.getColor(system_notification_accent_color))
-                        .addAction(disconnectAction)
                         .apply { focusExtras?.let { addExtras(it) } }
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
                         .build(),
@@ -282,9 +280,10 @@ object MiBluetoothToastHook : HookContext() {
                     "cythen.hyperdrop.action.sendstrongtoast" -> {
                         val batteryParams = p1.getParcelableExtra("batteryParams", BatteryParams::class.java)
                             ?: return
-                        val address = p1.getStringExtra("address").orEmpty()
-                        val shown = FocusIslandUtil.showBatteryIsland(receiverCtx, prefs, batteryParams, address)
-                        android.util.Log.d("HyperDrop-Island", "Focus request handled shown=$shown address=$address")
+                        // The island is part of the persistent focus notification now.
+                        // Posting a separate short-lived 10086 notification cancelled the
+                        // HyperOS focus session and removed AOD after 4s.
+                        android.util.Log.d("HyperDrop-Island", "Focus request ignored (island attached to persistent card)")
                     }
                     "com.android.bluetooth.headset.notification.cancle" -> {
                         val device = p1.getParcelableExtra(
