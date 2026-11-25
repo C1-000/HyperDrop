@@ -17,6 +17,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import com.xzakota.hyper.notification.focus.FocusNotification
+import cythen.hyperdrop.utils.FocusIslandUtil
 import cythen.hyperdrop.utils.PodImageLoader
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -135,10 +136,11 @@ object MiBluetoothToastHook : HookContext() {
                 val aodText = aodParts.joinToString(" | ")
                 val focusExtras = FocusNotification.buildV3 {
                     val logo = createPicture("key_headset", headsetIcon)
-                    // AOD/island stay attached to this persistent notification. Session
-                    // persistence model: enableFloat=false (updates must not re-float the
-                    // island) and NO dismissIsland/islandTimeout, because killing the
-                    // island killed AOD in fix2 (10086 cancel) and fix4 (timeout expiry).
+                    // AOD rides this persistent card (fix6 decision): the focus session
+                    // lives as long as the card, so AOD survives screen on/off cycles.
+                    // NO island block here: an island on the persistent card rendered
+                    // card-like content permanently (fix5 on-device). The temporary
+                    // island is the separate short-lived 10086 carrier (FocusIslandUtil).
                     enableFloat = false
                     ticker = alias ?: ""
                     updatable = true
@@ -154,34 +156,6 @@ object MiBluetoothToastHook : HookContext() {
                         title = alias ?: ""
                         content = contentText
                     }
-
-                    island {
-                        islandProperty = 1
-                        // Only bigIslandArea here; no smallIslandArea (avoids a permanent
-                        // summary capsule). No dismissIsland/islandTimeout: ending the
-                        // island session also ended AOD (fix2/fix4 evidence), so the focus
-                        // session now lives as long as this persistent card.
-                        bigIslandArea {
-                            imageTextInfoLeft {
-                                type = 1
-                                picInfo {
-                                    type = 1
-                                    pic = logo
-                                }
-                                textInfo {
-                                    title = alias ?: ""
-                                }
-                            }
-                            imageTextInfoRight {
-                                type = 2
-                                textInfo {
-                                    // The island right column only renders title, not content.
-                                    title = contentText
-                                }
-                            }
-                        }
-                    }
-
 
                     // Single circular Close button on the right side of the card. The X is
                     // stroke-drawn with round caps (Miuix close-glyph look) instead of the
@@ -289,10 +263,16 @@ object MiBluetoothToastHook : HookContext() {
                     "cythen.hyperdrop.action.sendstrongtoast" -> {
                         val batteryParams = p1.getParcelableExtra("batteryParams", BatteryParams::class.java)
                             ?: return
-                        // The island is part of the persistent focus notification now.
-                        // Posting a separate short-lived 10086 notification cancelled the
-                        // HyperOS focus session and removed AOD after 4s.
-                        android.util.Log.d("HyperDrop-Island", "Focus request ignored (island attached to persistent card)")
+                        // Temporary island, pre-fix2 form: a separate short-lived 10086
+                        // carrier floats the island and auto-cancels after 4s. AOD does
+                        // NOT ride this carrier - cancelling it would kill an AOD bound
+                        // to it; AOD lives on the persistent card instead.
+                        FocusIslandUtil.showBatteryIsland(
+                            receiverCtx,
+                            prefs,
+                            batteryParams,
+                            p1.getStringExtra("address").orEmpty(),
+                        )
                     }
                     "com.android.bluetooth.headset.notification.cancle" -> {
                         val device = p1.getParcelableExtra(
