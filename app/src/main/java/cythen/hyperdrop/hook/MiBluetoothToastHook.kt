@@ -18,9 +18,6 @@ import android.graphics.drawable.Icon
 import android.os.Bundle
 import com.xzakota.hyper.notification.focus.FocusNotification
 import cythen.hyperdrop.utils.PodImageLoader
-import cythen.hyperdrop.utils.SystemApisUtils
-import cythen.hyperdrop.utils.SystemApisUtils.cancelAsUser
-import cythen.hyperdrop.utils.SystemApisUtils.notifyAsUser
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
 import cythen.hyperdrop.utils.miuiStrongToast.data.OppoPodsAction
@@ -138,10 +135,11 @@ object MiBluetoothToastHook : HookContext() {
                 val aodText = aodParts.joinToString(" | ")
                 val focusExtras = FocusNotification.buildV3 {
                     val logo = createPicture("key_headset", headsetIcon)
-                    // AOD/island must stay attached to this persistent notification.
-                    // enableFloat=true re-expands the island on each battery update;
-                    // dismissIsland/islandTimeout below still collapse it after 5s.
-                    enableFloat = true
+                    // AOD/island stay attached to this persistent notification. Session
+                    // persistence model: enableFloat=false (updates must not re-float the
+                    // island) and NO dismissIsland/islandTimeout, because killing the
+                    // island killed AOD in fix2 (10086 cancel) and fix4 (timeout expiry).
+                    enableFloat = false
                     ticker = alias ?: ""
                     updatable = true
                     // AOD text lives on the template base so it survives the focus session.
@@ -160,10 +158,9 @@ object MiBluetoothToastHook : HookContext() {
                     island {
                         islandProperty = 1
                         // Only bigIslandArea here; no smallIslandArea (avoids a permanent
-                        // summary capsule). Island collapses after a few seconds while
-                        // the AOD text on this persistent card remains.
-                        dismissIsland = true
-                        islandTimeout = 5
+                        // summary capsule). No dismissIsland/islandTimeout: ending the
+                        // island session also ended AOD (fix2/fix4 evidence), so the focus
+                        // session now lives as long as this persistent card.
                         bigIslandArea {
                             imageTextInfoLeft {
                                 type = 1
@@ -186,27 +183,32 @@ object MiBluetoothToastHook : HookContext() {
                     }
 
 
-                    // Single circular Close button on the right side of the card.
-                    // Miuix Close.Regular is rasterized from a local vector because this
-                    // notification is built inside com.xiaomi.bluetooth (no Compose here).
+                    // Single circular Close button on the right side of the card. The X is
+                    // stroke-drawn with round caps (Miuix close-glyph look) instead of the
+                    // Close.Regular fill path so the weight is directly controllable:
+                    // the Regular bar is ~0.038 * size, 0.055 * size is one notch bolder.
                     // Bake the dark circle into the bitmap as well as setting actionBgColor:
                     // some HyperOS builds ignore the JSON color field for type=0 actions.
                     val closeSize = (20f * moduleContext.resources.displayMetrics.density).toInt()
                         .coerceAtLeast(1)
-                    val closeDrawable = moduleContext.getDrawable(R.drawable.ic_miuix_close)?.mutate()
-                    val closeKey = if (closeDrawable != null) {
+                    val closeKey = run {
                         val closeBitmap = Bitmap.createBitmap(closeSize, closeSize, Bitmap.Config.ARGB_8888)
                         val closeCanvas = Canvas(closeBitmap)
                         val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                             color = 0x66000000
                         }
                         closeCanvas.drawCircle(closeSize / 2f, closeSize / 2f, closeSize / 2f, bgPaint)
-                        val inset = (closeSize * 0.28f).toInt()
-                        closeDrawable.setTint(android.graphics.Color.WHITE)
-                        closeDrawable.setBounds(inset, inset, closeSize - inset, closeSize - inset)
-                        closeDrawable.draw(closeCanvas)
+                        val strokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.WHITE
+                            style = android.graphics.Paint.Style.STROKE
+                            strokeCap = android.graphics.Paint.Cap.ROUND
+                            strokeWidth = closeSize * 0.055f
+                        }
+                        val pad = closeSize * 0.34f
+                        closeCanvas.drawLine(pad, pad, closeSize - pad, closeSize - pad, strokePaint)
+                        closeCanvas.drawLine(closeSize - pad, pad, pad, closeSize - pad, strokePaint)
                         createPicture("key_close", Icon.createWithBitmap(closeBitmap))
-                    } else null
+                    }
                     val disconnectParcel = Notification.Action.Builder(
                         Icon.createWithResource(context, android.R.drawable.ic_delete),
                         moduleContext.getString(R.string.notification_btn_disconnect),
@@ -217,23 +219,21 @@ object MiBluetoothToastHook : HookContext() {
                             type = 0
                             actionBgColor = "#66000000"
                             actionBgColorDark = "#66000000"
-                            if (closeKey != null) {
-                                actionIcon = closeKey
-                                actionIconDark = closeKey
-                            }
+                            actionIcon = closeKey
+                            actionIconDark = closeKey
                             action = createAction("key_disconnect", disconnectParcel)
                         }
                     }
                 }
                 Log.d("HyperDrop", "focus param: ${focusExtras?.getString("miui.focus.param")}")
-                notificationManager.notifyAsUser(
+                notificationManager.notify(
                     "BTHeadset$address",
                     10003,
                     Notification.Builder(context, "BTHeadset$address")
                         .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                         .setWhen(0L)
                         .setTicker(alias)
-                        .setDefaults(-1)
+                        .setOnlyAlertOnce(true)
                         .setContentTitle(alias)
                         .setContentText(contentText)
                         // Keep this persistent headset card alive across manual swipes:
@@ -245,9 +245,11 @@ object MiBluetoothToastHook : HookContext() {
                         .setColor(context.getColor(system_notification_accent_color))
                         .apply { focusExtras?.let { addExtras(it) } }
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
-                        .build(),
-                    SystemApisUtils.getUserAllUserHandle()
+                        .build()
                 )
+                // Plain notify() matches every proven-working island: the old 10086
+                // carrier floated via notify(), while notifyAsUser(UserHandle.ALL)
+                // never floated on HyperOS phones.
             } catch (e: Exception) {
                 Log.e("HyperDrop", "Failed to create Pod Notification", e)
             }
@@ -261,7 +263,7 @@ object MiBluetoothToastHook : HookContext() {
                 restoreRunnables.remove(address)?.let { restoreHandler.removeCallbacks(it) }
                 if (address.isNotEmpty()) {
                     val notificationManager = context.getSystemService("notification") as NotificationManager
-                    notificationManager.cancelAsUser("BTHeadset$address", 10003, SystemApisUtils.getUserAllUserHandle())
+                    notificationManager.cancel("BTHeadset$address", 10003)
                 }
             } catch (e: Exception) {
                 Log.e("HyperDrop", "Failed to cancel Pod Notification!", e)
