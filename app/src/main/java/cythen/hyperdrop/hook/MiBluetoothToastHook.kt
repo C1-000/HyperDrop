@@ -17,7 +17,6 @@ import android.graphics.Canvas
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import com.xzakota.hyper.notification.focus.FocusNotification
-import cythen.hyperdrop.utils.FocusIslandUtil
 import cythen.hyperdrop.utils.PodImageLoader
 import cythen.hyperdrop.config.ConfigManager
 import cythen.hyperdrop.utils.miuiStrongToast.data.BatteryParams
@@ -136,11 +135,15 @@ object MiBluetoothToastHook : HookContext() {
                 val aodText = aodParts.joinToString(" | ")
                 val focusExtras = FocusNotification.buildV3 {
                     val logo = createPicture("key_headset", headsetIcon)
-                    // AOD rides this persistent card (fix6 decision): the focus session
-                    // lives as long as the card, so AOD survives screen on/off cycles.
-                    // NO island block here: an island on the persistent card rendered
-                    // card-like content permanently (fix5 on-device). The temporary
-                    // island is the separate short-lived 10086 carrier (FocusIslandUtil).
+                    // AOD rides this persistent card: the focus session lives as long as
+                    // the card, so AOD survives screen on/off cycles.
+                    //
+                    // The island block MUST be present (fix6 on-device): with no
+                    // param_island at all HyperOS adds a default *permanent* summary
+                    // capsule that never goes away. Giving bigIslandArea only (no
+                    // smallIslandArea = no summary-state content) plus dismissIsland
+                    // makes the island pop and retreat by itself. enableFloat stays
+                    // false so battery updates never re-float it (MiuixMoondrop form).
                     enableFloat = false
                     ticker = alias ?: ""
                     updatable = true
@@ -155,6 +158,33 @@ object MiBluetoothToastHook : HookContext() {
                         }
                         title = alias ?: ""
                         content = contentText
+                    }
+
+                    island {
+                        islandProperty = 1
+                        // bigIslandArea only: smallIslandArea is the summary-state slot;
+                        // leaving it out gives the summary state no content to dwell on.
+                        dismissIsland = true
+                        islandTimeout = 5
+                        bigIslandArea {
+                            imageTextInfoLeft {
+                                type = 1
+                                picInfo {
+                                    type = 1
+                                    pic = logo
+                                }
+                                textInfo {
+                                    title = alias ?: ""
+                                }
+                            }
+                            imageTextInfoRight {
+                                type = 2
+                                textInfo {
+                                    // The island right column only renders title, not content.
+                                    title = contentText
+                                }
+                            }
+                        }
                     }
 
                     // Single circular Close button on the right side of the card. The X is
@@ -263,16 +293,11 @@ object MiBluetoothToastHook : HookContext() {
                     "cythen.hyperdrop.action.sendstrongtoast" -> {
                         val batteryParams = p1.getParcelableExtra("batteryParams", BatteryParams::class.java)
                             ?: return
-                        // Temporary island, pre-fix2 form: a separate short-lived 10086
-                        // carrier floats the island and auto-cancels after 4s. AOD does
-                        // NOT ride this carrier - cancelling it would kill an AOD bound
-                        // to it; AOD lives on the persistent card instead.
-                        FocusIslandUtil.showBatteryIsland(
-                            receiverCtx,
-                            prefs,
-                            batteryParams,
-                            p1.getStringExtra("address").orEmpty(),
-                        )
+                        // The island rides the persistent card itself (fix7): its
+                        // bigIslandArea pops on the card post and retreats after
+                        // islandTimeout. No separate 10086 carrier: a second carrier
+                        // floated a duplicate island on top of the card's own one.
+                        android.util.Log.d("HyperDrop-Island", "Focus request handled by persistent card island")
                     }
                     "com.android.bluetooth.headset.notification.cancle" -> {
                         val device = p1.getParcelableExtra(
